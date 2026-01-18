@@ -1,0 +1,9 @@
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/repository/UserRepository.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/model/User.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/FitnessBotApplication.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/service/TrainingDayService.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/model/Exercise.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/repository/ExerciseRepository.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/model/TrainingDay.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/repository/TrainingDayRepository.java
+/Users/levzilberman/fitness/src/main/java/com/example/fitnessbot/parser/TrainingDayParser.java

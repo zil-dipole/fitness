@@ -1,0 +1,43 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-exercises-table
+      author: developer
+      changes:
+        - createTable:
+            tableName: exercises
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: training_day_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_exercise_training_day
+                    references: training_days(id)
+              - column:
+                  name: position
+                  type: integer
+              - column:
+                  name: section
+                  type: varchar(255)
+              - column:
+                  name: name
+                  type: varchar(255)
+              - column:
+                  name: sets
+                  type: integer
+              - column:
+                  name: reps_or_duration
+                  type: varchar(255)
+              - column:
+                  name: notes
+                  type: text
+              - column:
+                  name: last_weight_kg
+                  type: double

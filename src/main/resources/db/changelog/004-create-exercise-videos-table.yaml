@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-exercise-videos-table
+      author: developer
+      changes:
+        - createTable:
+            tableName: exercise_videos
+            columns:
+              - column:
+                  name: exercise_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_exercise_video_exercise
+                    references: exercises(id)
+              - column:
+                  name: video_url
+                  type: varchar(2048)
+                  constraints:
+                    nullable: false

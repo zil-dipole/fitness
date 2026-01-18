@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.example.fitnessbot.integration.TrainingDayServiceIntegrationTest
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.571 s -- in com.example.fitnessbot.integration.TrainingDayServiceIntegrationTest
