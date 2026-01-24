@@ -43,5 +43,5 @@ management:
 # Telegram Bot Configuration
 telegram:
   bot:
-    token: 8564618527:AAEQtwFG_2-Ze01q5HLDJIn4-hdmuo0KVRc
+    token: ${TELEGRAM_BOT_TOKEN}
     username: zil_fit_bot
