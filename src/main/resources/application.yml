@@ -29,3 +29,19 @@ spring:
 # Server Configuration
 server:
   port: 8080
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,beans,conditions,mappings,startup
+  endpoint:
+    health:
+      show-details: always
+
+# Telegram Bot Configuration
+telegram:
+  bot:
+    token: 8564618527:AAEQtwFG_2-Ze01q5HLDJIn4-hdmuo0KVRc
+    username: zil_fit_bot

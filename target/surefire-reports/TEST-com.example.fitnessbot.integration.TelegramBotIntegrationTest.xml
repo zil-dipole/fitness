@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.example.fitnessbot.integration.TrainingDayServiceIntegrationTest" time="6.228" tests="2" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.example.fitnessbot.integration.TelegramBotIntegrationTest" time="1.604" tests="1" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="25"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -48,7 +48,7 @@
     <property name="localRepository" value="/Users/levzilberman/.m2/repository"/>
     <property name="java.vendor.url.bug" value="https://github.com/Homebrew/homebrew-core/issues"/>
     <property name="java.io.tmpdir" value="/var/folders/cg/13l_6gw90hj9fp2mf541syl40000gn/T/"/>
-    <property name="com.zaxxer.hikari.pool_number" value="1"/>
+    <property name="com.zaxxer.hikari.pool_number" value="3"/>
     <property name="java.version" value="25.0.1"/>
     <property name="user.dir" value="/Users/levzilberman/fitness"/>
     <property name="os.arch" value="aarch64"/>
@@ -66,30 +66,11 @@
     <property name="socksNonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.class.version" value="69.0"/>
   </properties>
-  <testcase name="testProcessForwardedMessage" classname="com.example.fitnessbot.integration.TrainingDayServiceIntegrationTest" time="0.439">
-    <system-out><![CDATA[21:44:58.711 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.example.fitnessbot.integration.TrainingDayServiceIntegrationTest]: TrainingDayServiceIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-21:44:58.781 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.fitnessbot.FitnessBotApplication for test class com.example.fitnessbot.integration.TrainingDayServiceIntegrationTest
-21:44:58.846 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
-21:44:58.847 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
-21:44:58.968 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
-21:44:59.135 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
-21:44:59.136 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
-21:44:59.153 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
-  Server Version: 24.0.5
-  API Version: 1.43
-  Operating System: Docker Desktop
-  Total Memory: 7851 MB
-21:44:59.186 [main] INFO tc.testcontainers/ryuk:0.6.0 -- Creating container for image: testcontainers/ryuk:0.6.0
-21:44:59.565 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Credential helper/store (docker-credential-desktop) does not have credentials for https://index.docker.io/v1/
-21:44:59.644 [main] INFO tc.testcontainers/ryuk:0.6.0 -- Container testcontainers/ryuk:0.6.0 is starting: 2e652a7291cafe03365e1728f849403372bf58fe815b83d4401a18fb84c4c3ae
-21:44:59.923 [main] INFO tc.testcontainers/ryuk:0.6.0 -- Container testcontainers/ryuk:0.6.0 started in PT0.736284S
-21:44:59.932 [main] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
-21:44:59.932 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
-21:44:59.933 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
-21:44:59.933 [main] INFO tc.postgres:15 -- Creating container for image: postgres:15
-21:44:59.952 [main] INFO tc.postgres:15 -- Container postgres:15 is starting: 57cac87e39f5423d1e3c4ec6dddd45bbf0a292a50610f2226115bace85584623
-21:45:00.954 [main] INFO tc.postgres:15 -- Container postgres:15 started in PT1.020442S
-21:45:00.954 [main] INFO tc.postgres:15 -- Container is started (JDBC URL: jdbc:postgresql://localhost:64355/fitness_bot_test?loggerLevel=OFF)
+  <testcase name="testContextLoads" classname="com.example.fitnessbot.integration.TelegramBotIntegrationTest" time="0.003">
+    <system-out><![CDATA[2026-01-24T21:45:06.617+01:00  INFO 98357 --- [           main] tc.postgres:15                           : Creating container for image: postgres:15
+2026-01-24T21:45:06.642+01:00  INFO 98357 --- [           main] tc.postgres:15                           : Container postgres:15 is starting: 0cd977a97320710edf80ba43588d9e66f113b61d338be882729ee9065987ee64
+2026-01-24T21:45:07.594+01:00  INFO 98357 --- [           main] tc.postgres:15                           : Container postgres:15 started in PT0.976265S
+2026-01-24T21:45:07.594+01:00  INFO 98357 --- [           main] tc.postgres:15                           : Container is started (JDBC URL: jdbc:postgresql://localhost:64378/fitness_bot_telegram_test?loggerLevel=OFF)
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -99,152 +80,58 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.5)
 
-2026-01-24T21:45:01.117+01:00  INFO 98357 --- [           main] .e.f.i.TrainingDayServiceIntegrationTest : Starting TrainingDayServiceIntegrationTest using Java 25.0.1 with PID 98357 (started by levzilberman in /Users/levzilberman/fitness)
-2026-01-24T21:45:01.117+01:00  INFO 98357 --- [           main] .e.f.i.TrainingDayServiceIntegrationTest : No active profile set, falling back to 1 default profile: "default"
-2026-01-24T21:45:01.643+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
-2026-01-24T21:45:01.643+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2026-01-24T21:45:01.725+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 78 ms. Found 3 JPA repository interfaces.
-2026-01-24T21:45:01.735+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
-2026-01-24T21:45:01.736+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-01-24T21:45:01.743+01:00  INFO 98357 --- [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.example.fitnessbot.repository.ExerciseRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-01-24T21:45:01.744+01:00  INFO 98357 --- [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.example.fitnessbot.repository.TrainingDayRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-01-24T21:45:01.744+01:00  INFO 98357 --- [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.example.fitnessbot.repository.UserRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
-2026-01-24T21:45:01.744+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 3 ms. Found 0 Redis repository interfaces.
-2026-01-24T21:45:02.013+01:00  INFO 98357 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2026-01-24T21:45:02.128+01:00  INFO 98357 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@7bd694a5
-2026-01-24T21:45:02.129+01:00  INFO 98357 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2026-01-24T21:45:02.225+01:00  INFO 98357 --- [           main] liquibase.database                       : Set default schema name to public
-2026-01-24T21:45:02.374+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Creating database history table with name: public.databasechangelog
-2026-01-24T21:45:02.389+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Reading from public.databasechangelog
-2026-01-24T21:45:02.457+01:00  INFO 98357 --- [           main] liquibase.lockservice                    : Successfully acquired change log lock
-2026-01-24T21:45:02.460+01:00  INFO 98357 --- [           main] liquibase.command                        : Using deploymentId: 9287502459
-2026-01-24T21:45:02.461+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Reading from public.databasechangelog
+2026-01-24T21:45:07.606+01:00  INFO 98357 --- [           main] c.e.f.i.TelegramBotIntegrationTest       : Starting TelegramBotIntegrationTest using Java 25.0.1 with PID 98357 (started by levzilberman in /Users/levzilberman/fitness)
+2026-01-24T21:45:07.606+01:00  INFO 98357 --- [           main] c.e.f.i.TelegramBotIntegrationTest       : No active profile set, falling back to 1 default profile: "default"
+2026-01-24T21:45:07.688+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-01-24T21:45:07.688+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-24T21:45:07.691+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 3 ms. Found 3 JPA repository interfaces.
+2026-01-24T21:45:07.692+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-01-24T21:45:07.692+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-01-24T21:45:07.693+01:00  INFO 98357 --- [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.example.fitnessbot.repository.ExerciseRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-01-24T21:45:07.693+01:00  INFO 98357 --- [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.example.fitnessbot.repository.TrainingDayRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-01-24T21:45:07.693+01:00  INFO 98357 --- [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.example.fitnessbot.repository.UserRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-01-24T21:45:07.693+01:00  INFO 98357 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 0 ms. Found 0 Redis repository interfaces.
+2026-01-24T21:45:07.725+01:00  INFO 98357 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Starting...
+2026-01-24T21:45:07.747+01:00  INFO 98357 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-3 - Added connection org.postgresql.jdbc.PgConnection@3c55ef94
+2026-01-24T21:45:07.748+01:00  INFO 98357 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Start completed.
+2026-01-24T21:45:07.753+01:00  INFO 98357 --- [           main] liquibase.database                       : Set default schema name to public
+2026-01-24T21:45:07.776+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Creating database history table with name: public.databasechangelog
+2026-01-24T21:45:07.780+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Reading from public.databasechangelog
+2026-01-24T21:45:07.802+01:00  INFO 98357 --- [           main] liquibase.lockservice                    : Successfully acquired change log lock
+2026-01-24T21:45:07.803+01:00  INFO 98357 --- [           main] liquibase.command                        : Using deploymentId: 9287507803
+2026-01-24T21:45:07.804+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Reading from public.databasechangelog
 Running Changeset: db/changelog/001-create-users-table.yaml::001-create-users-table::developer
-2026-01-24T21:45:02.486+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table users created
-2026-01-24T21:45:02.487+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/001-create-users-table.yaml::001-create-users-table::developer ran successfully in 14ms
+2026-01-24T21:45:07.811+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table users created
+2026-01-24T21:45:07.811+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/001-create-users-table.yaml::001-create-users-table::developer ran successfully in 4ms
 Running Changeset: db/changelog/002-create-training-days-table.yaml::002-create-training-days-table::developer
-2026-01-24T21:45:02.495+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table training_days created
-2026-01-24T21:45:02.496+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/002-create-training-days-table.yaml::002-create-training-days-table::developer ran successfully in 4ms
+2026-01-24T21:45:07.817+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table training_days created
+2026-01-24T21:45:07.818+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/002-create-training-days-table.yaml::002-create-training-days-table::developer ran successfully in 4ms
 Running Changeset: db/changelog/003-create-exercises-table.yaml::003-create-exercises-table::developer
-2026-01-24T21:45:02.511+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table exercises created
-2026-01-24T21:45:02.512+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/003-create-exercises-table.yaml::003-create-exercises-table::developer ran successfully in 13ms
+2026-01-24T21:45:07.823+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table exercises created
+2026-01-24T21:45:07.824+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/003-create-exercises-table.yaml::003-create-exercises-table::developer ran successfully in 3ms
 Running Changeset: db/changelog/004-create-exercise-videos-table.yaml::004-create-exercise-videos-table::developer
-2026-01-24T21:45:02.518+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table exercise_videos created
-2026-01-24T21:45:02.519+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/004-create-exercise-videos-table.yaml::004-create-exercise-videos-table::developer ran successfully in 4ms
-2026-01-24T21:45:02.522+01:00  INFO 98357 --- [           main] liquibase.util                           : UPDATE SUMMARY
-2026-01-24T21:45:02.523+01:00  INFO 98357 --- [           main] liquibase.util                           : Run:                          4
-2026-01-24T21:45:02.523+01:00  INFO 98357 --- [           main] liquibase.util                           : Previously run:               0
-2026-01-24T21:45:02.523+01:00  INFO 98357 --- [           main] liquibase.util                           : Filtered out:                 0
-2026-01-24T21:45:02.523+01:00  INFO 98357 --- [           main] liquibase.util                           : -------------------------------
-2026-01-24T21:45:02.523+01:00  INFO 98357 --- [           main] liquibase.util                           : Total change sets:            4
-2026-01-24T21:45:02.523+01:00  INFO 98357 --- [           main] liquibase.util                           : Update summary generated
-2026-01-24T21:45:02.524+01:00  INFO 98357 --- [           main] liquibase.command                        : Update command completed successfully.
+2026-01-24T21:45:07.828+01:00  INFO 98357 --- [           main] liquibase.changelog                      : Table exercise_videos created
+2026-01-24T21:45:07.829+01:00  INFO 98357 --- [           main] liquibase.changelog                      : ChangeSet db/changelog/004-create-exercise-videos-table.yaml::004-create-exercise-videos-table::developer ran successfully in 3ms
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.util                           : UPDATE SUMMARY
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.util                           : Run:                          4
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.util                           : Previously run:               0
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.util                           : Filtered out:                 0
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.util                           : -------------------------------
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.util                           : Total change sets:            4
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.util                           : Update summary generated
+2026-01-24T21:45:07.830+01:00  INFO 98357 --- [           main] liquibase.command                        : Update command completed successfully.
 Liquibase: Update has been successful. Rows affected: 4
-2026-01-24T21:45:02.527+01:00  INFO 98357 --- [           main] liquibase.lockservice                    : Successfully released change log lock
-2026-01-24T21:45:02.528+01:00  INFO 98357 --- [           main] liquibase.command                        : Command execution complete
-2026-01-24T21:45:02.585+01:00  INFO 98357 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2026-01-24T21:45:02.617+01:00  INFO 98357 --- [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.4.4.Final
-2026-01-24T21:45:02.635+01:00  INFO 98357 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2026-01-24T21:45:02.756+01:00  INFO 98357 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2026-01-24T21:45:02.782+01:00  WARN 98357 --- [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2026-01-24T21:45:03.220+01:00  INFO 98357 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2026-01-24T21:45:03.238+01:00  INFO 98357 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2026-01-24T21:45:03.602+01:00  WARN 98357 --- [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
-2026-01-24T21:45:04.149+01:00  INFO 98357 --- [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint(s) beneath base path '/actuator'
-2026-01-24T21:45:04.194+01:00  INFO 98357 --- [           main] .e.f.i.TrainingDayServiceIntegrationTest : Started TrainingDayServiceIntegrationTest in 3.215 seconds (process running for 5.886)
-Hibernate: 
-    insert 
-    into
-        users
-        (created_at, name, telegram_id, weight_kg) 
-    values
-        (?, ?, ?, ?)
-Hibernate: 
-    select
-        u1_0.id,
-        u1_0.created_at,
-        u1_0.name,
-        u1_0.telegram_id,
-        u1_0.weight_kg 
-    from
-        users u1_0 
-    where
-        u1_0.telegram_id=?
-Hibernate: 
-    insert 
-    into
-        training_days
-        (created_at, raw_text, title, user_id) 
-    values
-        (?, ?, ?, ?)
-Hibernate: 
-    insert 
-    into
-        exercises
-        (last_weight_kg, name, notes, position, reps_or_duration, section, sets, training_day_id) 
-    values
-        (?, ?, ?, ?, ?, ?, ?, ?)
-Hibernate: 
-    insert 
-    into
-        exercises
-        (last_weight_kg, name, notes, position, reps_or_duration, section, sets, training_day_id) 
-    values
-        (?, ?, ?, ?, ?, ?, ?, ?)
-Hibernate: 
-    insert 
-    into
-        exercises
-        (last_weight_kg, name, notes, position, reps_or_duration, section, sets, training_day_id) 
-    values
-        (?, ?, ?, ?, ?, ?, ?, ?)
-Hibernate: 
-    insert 
-    into
-        exercises
-        (last_weight_kg, name, notes, position, reps_or_duration, section, sets, training_day_id) 
-    values
-        (?, ?, ?, ?, ?, ?, ?, ?)
-Hibernate: 
-    insert 
-    into
-        exercise_videos
-        (exercise_id, video_url) 
-    values
-        (?, ?)
-Hibernate: 
-    insert 
-    into
-        exercise_videos
-        (exercise_id, video_url) 
-    values
-        (?, ?)
-]]></system-out>
-    <system-err><![CDATA[WARNING: A Java agent has been loaded dynamically (/Users/levzilberman/.m2/repository/net/bytebuddy/byte-buddy-agent/1.14.13/byte-buddy-agent-1.14.13.jar)
-WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
-WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
-WARNING: Dynamic loading of agents will be disallowed by default in a future release
-]]></system-err>
-  </testcase>
-  <testcase name="testDatabaseConnection" classname="com.example.fitnessbot.integration.TrainingDayServiceIntegrationTest" time="0.016">
-    <system-out><![CDATA[Hibernate: 
-    insert 
-    into
-        users
-        (created_at, name, telegram_id, weight_kg) 
-    values
-        (?, ?, ?, ?)
-Hibernate: 
-    select
-        u1_0.id,
-        u1_0.created_at,
-        u1_0.name,
-        u1_0.telegram_id,
-        u1_0.weight_kg 
-    from
-        users u1_0 
-    where
-        u1_0.id=?
+2026-01-24T21:45:07.832+01:00  INFO 98357 --- [           main] liquibase.lockservice                    : Successfully released change log lock
+2026-01-24T21:45:07.833+01:00  INFO 98357 --- [           main] liquibase.command                        : Command execution complete
+2026-01-24T21:45:07.844+01:00  INFO 98357 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-24T21:45:07.845+01:00  INFO 98357 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-01-24T21:45:07.846+01:00  INFO 98357 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-24T21:45:07.847+01:00  WARN 98357 --- [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-24T21:45:07.883+01:00  INFO 98357 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-24T21:45:07.889+01:00  INFO 98357 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-24T21:45:07.947+01:00  WARN 98357 --- [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-24T21:45:08.077+01:00  INFO 98357 --- [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint(s) beneath base path '/actuator'
+2026-01-24T21:45:08.085+01:00  INFO 98357 --- [           main] c.e.f.i.TelegramBotIntegrationTest       : Started TelegramBotIntegrationTest in 0.488 seconds (process running for 9.777)
 ]]></system-out>
   </testcase>
 </testsuite>
