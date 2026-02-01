@@ -1,2 +1,4 @@
 .idea
 target
+target/
+/src/main/resources/application-with-creds.yml

@@ -69,7 +69,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             sendMessage.setText("✅ Training program received and processed successfully! Saved " +
                                trainingDay.getExercises().size() + " exercises.");
 
-            execute(sendMessage);
+            sendTelegramMessage(sendMessage);
         } catch (Exception e) {
             log.error("Error processing forwarded message from user " + userId, e);
 
@@ -78,8 +78,8 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             sendMessage.setText("❌ Sorry, there was an error processing your training program. Please try again.");
 
             try {
-                execute(sendMessage);
-            } catch (TelegramApiException telegramApiException) {
+                sendTelegramMessage(sendMessage);
+            } catch (Exception telegramApiException) {
                 log.error("Failed to send error message to user", telegramApiException);
             }
         }
@@ -113,9 +113,16 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         }
 
         try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
+            sendTelegramMessage(sendMessage);
+        } catch (Exception e) {
             log.error("Failed to send message to user", e);
         }
+    }
+
+    /**
+     * Wrapper method for sending Telegram messages to enable easier testing
+     */
+    protected void sendTelegramMessage(SendMessage sendMessage) throws Exception {
+        execute(sendMessage);
     }
 }

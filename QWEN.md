@@ -11,8 +11,8 @@ The core functionality involves:
 - Providing an interactive Telegram UI for users to step through exercises and log their performance.
 
 Technologies used:
-- **Language**: Java 17 (updated from Java 25 for compatibility)
-- **Framework**: Spring Boot 3.2.5
+- **Language**: Java 21
+- **Framework**: Spring Boot 3.3.0
 - **Database**: PostgreSQL (via Spring Data JPA)
 - **Messaging**: Telegram Bots API (using `telegrambots-spring-boot-starter`)
 - **Caching/Queue**: Redis
@@ -31,7 +31,7 @@ The application follows a layered architecture:
 ## Building, Running & Testing
 
 ### Prerequisites
-- JDK 17 (updated from JDK 25 for better compatibility with Spring Boot 3.2.5)
+- JDK 21
 - Maven 3.6+
 - Docker (for TestContainers integration testing)
 - PostgreSQL database (for development - see Database Setup below)

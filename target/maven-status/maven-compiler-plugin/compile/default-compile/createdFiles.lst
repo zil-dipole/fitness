@@ -1,9 +1,0 @@
-com/example/fitnessbot/model/TrainingDay.class
-com/example/fitnessbot/parser/TrainingDayParser.class
-com/example/fitnessbot/service/TrainingDayService.class
-com/example/fitnessbot/model/Exercise.class
-com/example/fitnessbot/FitnessBotApplication.class
-com/example/fitnessbot/repository/TrainingDayRepository.class
-com/example/fitnessbot/model/User.class
-com/example/fitnessbot/repository/UserRepository.class
-com/example/fitnessbot/repository/ExerciseRepository.class

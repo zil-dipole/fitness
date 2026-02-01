@@ -4,7 +4,7 @@ A Telegram bot for parsing workout programs and tracking progress.
 
 ## Prerequisites
 
-- Java 17
+- Java 21
 - Maven 3.6+
 - Docker and Docker Compose (for local development)
 
@@ -37,6 +37,8 @@ To run tests:
 ```bash
 mvn test
 ```
+
+This will run both unit tests and integration tests with Java 21.
 
 ## Development
 

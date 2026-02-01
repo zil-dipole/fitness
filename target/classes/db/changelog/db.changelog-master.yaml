@@ -1,9 +1,0 @@
-databaseChangeLog:
-  - include:
-      file: db/changelog/001-create-users-table.yaml
-  - include:
-      file: db/changelog/002-create-training-days-table.yaml
-  - include:
-      file: db/changelog/003-create-exercises-table.yaml
-  - include:
-      file: db/changelog/004-create-exercise-videos-table.yaml

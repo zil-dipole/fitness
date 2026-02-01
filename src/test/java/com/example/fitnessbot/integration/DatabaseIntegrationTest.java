@@ -1,5 +1,6 @@
 package com.example.fitnessbot.integration;
 
+import com.example.fitnessbot.FitnessBotApplication;
 import com.example.fitnessbot.model.User;
 import com.example.fitnessbot.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(classes = FitnessBotApplication.class)
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class DatabaseIntegrationTest {
