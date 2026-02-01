@@ -1,6 +1,9 @@
 package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.telegram.commands.CommandHandler;
+import com.example.fitnessbot.telegram.commands.HelpCommandHandler;
+import com.example.fitnessbot.telegram.commands.StartCommandHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -9,7 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.User;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -24,7 +28,12 @@ class FitnessTelegramBotUnitTest {
     private TrainingDayService trainingDayService;
 
     @Spy
-    private FitnessTelegramBot fitnessTelegramBot = new FitnessTelegramBot(trainingDayService, "test-token", "test-username");
+    private FitnessTelegramBot fitnessTelegramBot;
+
+    {
+        List<CommandHandler> commandHandlers = List.of(new StartCommandHandler(), new HelpCommandHandler());
+        fitnessTelegramBot = new FitnessTelegramBot(trainingDayService, commandHandlers, "test-token", "test-username");
+    }
 
     @Test
     void testGetBotUsername() {
@@ -91,14 +100,11 @@ class FitnessTelegramBotUnitTest {
     private Update createMockUpdateWithCommand(String command, long userId) {
         Update update = mock(Update.class);
         Message message = mock(Message.class);
-        User user = mock(User.class);
 
         when(update.hasMessage()).thenReturn(true);
         when(update.getMessage()).thenReturn(message);
         when(message.hasText()).thenReturn(true);
         when(message.getText()).thenReturn(command);
-        when(message.getFrom()).thenReturn(user);
-        when(user.getId()).thenReturn(userId);
         when(message.getChatId()).thenReturn(CHAT_ID);
 
         return update;
