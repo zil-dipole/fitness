@@ -7,7 +7,6 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
@@ -18,16 +17,14 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class FitnessTelegramBotUnitTest {
 
+    private static final long USER_ID = 12345;
+    private static final long CHAT_ID = 6789;
+
     @Mock
     private TrainingDayService trainingDayService;
 
     @Spy
     private FitnessTelegramBot fitnessTelegramBot = new FitnessTelegramBot(trainingDayService, "test-token", "test-username");
-
-    @Test
-    void testGetBotToken() {
-        assertEquals("test-token", fitnessTelegramBot.getBotToken());
-    }
 
     @Test
     void testGetBotUsername() {
@@ -36,100 +33,75 @@ class FitnessTelegramBotUnitTest {
 
     @Test
     void testHandleStartCommand() throws Exception {
-        Update update = createMockUpdateWithCommand("/start", 12345, 67890L);
-        
+        Update update = createMockUpdateWithCommand("/start", USER_ID);
         // Mock the sendTelegramMessage method to avoid actual Telegram API calls
         doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
         
         fitnessTelegramBot.onUpdateReceived(update);
-        
-        verify(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
+
+        SendMessage message = new SendMessage();
+        message.setChatId(CHAT_ID);
+        message.setText("Welcome to Fitness Bot! Forward your workout programs to me and I'll parse and save them for you.");
+        verify(fitnessTelegramBot).sendTelegramMessage(message);
     }
 
     @Test
     void testHandleHelpCommand() throws Exception {
-        Update update = createMockUpdateWithCommand("/help", 12345, 67890L);
+        Update update = createMockUpdateWithCommand("/help", USER_ID);
         
         // Mock the sendTelegramMessage method to avoid actual Telegram API calls
         doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
         
         fitnessTelegramBot.onUpdateReceived(update);
-        
-        verify(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
+
+        SendMessage message = new SendMessage();
+        message.setChatId(CHAT_ID);
+        message.setText("""
+                Simply forward your workout program messages to me and I'll parse and save them.
+                
+                Supported format:
+                - Section headers ending with ':'
+                - Exercises with bullet points ('⁃' or '-')
+                - Sets and reps like "3 x 10"
+                - Video links
+                
+                Example:
+                Upper Body:
+                - Bench Press 3 x 10 (Warm up set)
+                - https://youtube.com/watch?v=example""");
+
+        verify(fitnessTelegramBot).sendTelegramMessage(message);
     }
 
     @Test
     void testHandleUnknownCommand() throws Exception {
-        Update update = createMockUpdateWithCommand("/unknown", 12345, 67890L);
+        Update update = createMockUpdateWithCommand("/unknown", 12345);
         
         // Mock the sendTelegramMessage method to avoid actual Telegram API calls
         doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
         
         fitnessTelegramBot.onUpdateReceived(update);
-        
-        verify(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
+
+        SendMessage message = new SendMessage();
+        message.setChatId(CHAT_ID);
+        message.setText("Unknown command. Send /help for usage instructions.");
+        verify(fitnessTelegramBot).sendTelegramMessage(message);
     }
 
-    // Helper methods to create mock updates
-    
-    private Update createMockUpdateWithCommand(String command, int userId, Long chatId) {
+    private Update createMockUpdateWithCommand(String command, long userId) {
         Update update = mock(Update.class);
         Message message = mock(Message.class);
         User user = mock(User.class);
-        Chat chat = mock(Chat.class);
-        
+
         when(update.hasMessage()).thenReturn(true);
         when(update.getMessage()).thenReturn(message);
         when(message.hasText()).thenReturn(true);
         when(message.getText()).thenReturn(command);
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(userId);
-        when(message.getChatId()).thenReturn(chatId);
-        when(message.getChat()).thenReturn(chat);
-        when(chat.getId()).thenReturn(chatId);
-        
+        when(message.getChatId()).thenReturn(CHAT_ID);
+
         return update;
     }
-    
-    private Update createMockUpdateWithForwardedMessage(String text, int userId, Long chatId) {
-        Update update = mock(Update.class);
-        Message message = mock(Message.class);
-        User user = mock(User.class);
-        Chat chat = mock(Chat.class);
-        User forwardFrom = mock(User.class);
-        
-        when(update.hasMessage()).thenReturn(true);
-        when(update.getMessage()).thenReturn(message);
-        when(message.hasText()).thenReturn(true);
-        when(message.getText()).thenReturn(text);
-        when(message.getFrom()).thenReturn(user);
-        when(user.getId()).thenReturn(userId);
-        when(message.getChatId()).thenReturn(chatId);
-        when(message.getChat()).thenReturn(chat);
-        when(chat.getId()).thenReturn(chatId);
-        when(message.getForwardFrom()).thenReturn(forwardFrom);
-        
-        return update;
-    }
-    
-    private Update createMockUpdateWithText(String text, int userId, Long chatId) {
-        Update update = mock(Update.class);
-        Message message = mock(Message.class);
-        User user = mock(User.class);
-        Chat chat = mock(Chat.class);
-        
-        when(update.hasMessage()).thenReturn(true);
-        when(update.getMessage()).thenReturn(message);
-        when(message.hasText()).thenReturn(true);
-        when(message.getText()).thenReturn(text);
-        when(message.getFrom()).thenReturn(user);
-        when(user.getId()).thenReturn(userId);
-        when(message.getChatId()).thenReturn(chatId);
-        when(message.getChat()).thenReturn(chat);
-        when(chat.getId()).thenReturn(chatId);
-        when(message.getForwardFrom()).thenReturn(null);
-        when(message.getForwardFromChat()).thenReturn(null);
-        
-        return update;
-    }
+
 }

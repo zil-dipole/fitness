@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 @Component
 @ConditionalOnProperty(name = "telegram.bot.token")
@@ -20,21 +19,14 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private final TrainingDayService trainingDayService;
 
-    private final String botToken;
-
     private final String botUsername;
 
     public FitnessTelegramBot(TrainingDayService trainingDayService,
                               @Value("${telegram.bot.token:}") String botToken,
                               @Value("${telegram.bot.username:}") String botUsername) {
+        super(botToken);
         this.trainingDayService = trainingDayService;
-        this.botToken = botToken;
         this.botUsername = botUsername;
-    }
-
-    @Override
-    public String getBotToken() {
-        return botToken;
     }
 
     @Override
@@ -56,7 +48,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleForwardedMessage(Update update) {
-        Long userId = update.getMessage().getFrom().getId().longValue();
+        Long userId = update.getMessage().getFrom().getId();
         String messageText = update.getMessage().getText();
 
         log.info("Processing forwarded message from user {} with text length {}", userId, messageText.length());
@@ -87,7 +79,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private void handleCommand(Update update) {
         String command = update.getMessage().getText();
-        Long userId = update.getMessage().getFrom().getId().longValue();
+        Long userId = update.getMessage().getFrom().getId();
 
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());

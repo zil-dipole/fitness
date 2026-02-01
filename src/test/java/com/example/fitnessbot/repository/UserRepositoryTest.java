@@ -1,5 +1,6 @@
 package com.example.fitnessbot.repository;
 
+import com.example.fitnessbot.AbstractWithDbTest;
 import com.example.fitnessbot.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,11 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestPropertySource(properties = {
-    "spring.datasource.url=jdbc:tc:postgresql:15:///databasename",
-    "spring.liquibase.enabled=true"
-})
-class UserRepositoryTest {
+class UserRepositoryTest extends AbstractWithDbTest {
 
     @Autowired
     private TestEntityManager entityManager;

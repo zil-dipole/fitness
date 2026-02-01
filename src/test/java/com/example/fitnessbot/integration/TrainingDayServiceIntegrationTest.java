@@ -1,12 +1,12 @@
 package com.example.fitnessbot.integration;
 
+import com.example.fitnessbot.AbstractWithDbTest;
 import com.example.fitnessbot.FitnessBotApplication;
 import com.example.fitnessbot.model.Exercise;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.User;
 import com.example.fitnessbot.repository.UserRepository;
 import com.example.fitnessbot.service.TrainingDayService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -20,23 +20,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = FitnessBotApplication.class)
-@Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class TrainingDayServiceIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
-            .withDatabaseName("fitness_bot_test")
-            .withUsername("test")
-            .withPassword("test");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.liquibase.enabled", () -> "true");
-    }
+class TrainingDayServiceIntegrationTest extends AbstractWithDbTest {
 
     @Autowired
     private TrainingDayService trainingDayService;
