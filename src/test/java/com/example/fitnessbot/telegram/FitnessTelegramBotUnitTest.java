@@ -1,5 +1,6 @@
 package com.example.fitnessbot.telegram;
 
+import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.telegram.commands.CommandHandler;
 import com.example.fitnessbot.telegram.commands.HelpCommandHandler;
@@ -32,7 +33,7 @@ class FitnessTelegramBotUnitTest {
 
     {
         List<CommandHandler> commandHandlers = List.of(new StartCommandHandler(), new HelpCommandHandler());
-        fitnessTelegramBot = new FitnessTelegramBot(trainingDayService, commandHandlers, "test-token", "test-username");
+        fitnessTelegramBot = new FitnessTelegramBot(trainingDayService, new ProgramCreationSessionManager(), commandHandlers, "test-token", "test-username");
     }
 
     @Test
@@ -42,7 +43,7 @@ class FitnessTelegramBotUnitTest {
 
     @Test
     void testHandleStartCommand() throws Exception {
-        Update update = createMockUpdateWithCommand("/start", USER_ID);
+        Update update = createMockUpdateWithCommand("/start");
         // Mock the sendTelegramMessage method to avoid actual Telegram API calls
         doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
         
@@ -56,7 +57,7 @@ class FitnessTelegramBotUnitTest {
 
     @Test
     void testHandleHelpCommand() throws Exception {
-        Update update = createMockUpdateWithCommand("/help", USER_ID);
+        Update update = createMockUpdateWithCommand("/help");
         
         // Mock the sendTelegramMessage method to avoid actual Telegram API calls
         doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
@@ -74,6 +75,12 @@ class FitnessTelegramBotUnitTest {
                 - Sets and reps like "3 x 10"
                 - Video links
                 
+                Program Creation Commands:
+                - /create_program <name> - Start creating a new program
+                - Forward training day messages to add them to the program
+                - /finish_program - Finish and save the program
+                - /cancel_program - Cancel program creation
+                
                 Example:
                 Upper Body:
                 - Bench Press 3 x 10 (Warm up set)
@@ -84,7 +91,7 @@ class FitnessTelegramBotUnitTest {
 
     @Test
     void testHandleUnknownCommand() throws Exception {
-        Update update = createMockUpdateWithCommand("/unknown", 12345);
+        Update update = createMockUpdateWithCommand("/unknown");
         
         // Mock the sendTelegramMessage method to avoid actual Telegram API calls
         doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
@@ -97,7 +104,7 @@ class FitnessTelegramBotUnitTest {
         verify(fitnessTelegramBot).sendTelegramMessage(message);
     }
 
-    private Update createMockUpdateWithCommand(String command, long userId) {
+    private Update createMockUpdateWithCommand(String command) {
         Update update = mock(Update.class);
         Message message = mock(Message.class);
 

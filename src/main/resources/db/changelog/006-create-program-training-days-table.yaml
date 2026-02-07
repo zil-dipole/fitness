@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-program-training-days-table
+      author: developer
+      changes:
+        - createTable:
+            tableName: program_training_days
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: program_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_program_training_days_program
+                    references: programs(id)
+              - column:
+                  name: training_day_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_program_training_days_training_day
+                    references: training_days(id)
+              - column:
+                  name: position
+                  type: INTEGER
+                  constraints:
+                    nullable: true

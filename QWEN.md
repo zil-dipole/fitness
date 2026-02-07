@@ -175,3 +175,9 @@ The application now includes:
 - Proper separation of main and test configurations.
 
 Future enhancements could involve integrating with AI services for advanced parsing or generating workout plans, though the current focus is on deterministic parsing of structured input.
+
+## Qwen Added Memories
+- "when you running tests and someting is failing, to fix that - try to find rootcause , not just remove all meaningfull parts of the test"
+- "after adding any new feature, create tests for that feature"
+- for making integration tests use abstractWithDbTest class ​
+- don't use leniet for mocks in tests

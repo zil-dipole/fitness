@@ -1,11 +1,13 @@
 package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.telegram.commands.CommandHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -14,21 +16,25 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "telegram.bot.token")
 public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private static final Logger log = LoggerFactory.getLogger(FitnessTelegramBot.class);
 
     private final TrainingDayService trainingDayService;
+    private final ProgramCreationSessionManager sessionManager;
     private final List<CommandHandler> commandHandlers;
 
     private final String botUsername;
 
     public FitnessTelegramBot(TrainingDayService trainingDayService,
+                              ProgramCreationSessionManager sessionManager,
                               List<CommandHandler> commandHandlers,
                               @Value("${telegram.bot.token:}") String botToken,
                               @Value("${telegram.bot.username:}") String botUsername) {
         super(botToken);
         this.trainingDayService = trainingDayService;
+        this.sessionManager = sessionManager;
         this.commandHandlers = commandHandlers;
         this.botUsername = botUsername;
     }
@@ -55,6 +61,12 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         Long userId = update.getMessage().getFrom().getId();
         String messageText = update.getMessage().getText();
 
+        // Check if user is in a program creation session
+        if (sessionManager.hasActiveSession(userId)) {
+            handleForwardedMessageDuringProgramCreation(update);
+            return;
+        }
+
         log.info("Processing forwarded message from user {} with text length {}", userId, messageText.length());
 
         try {
@@ -73,6 +85,39 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             sendMessage.setChatId(update.getMessage().getChatId().toString());
             sendMessage.setText("❌ Sorry, there was an error processing your training program. Please try again.");
 
+            try {
+                sendTelegramMessage(sendMessage);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send error message to user", telegramApiException);
+            }
+        }
+    }
+
+    private void handleForwardedMessageDuringProgramCreation(Update update) {
+        Long userId = update.getMessage().getFrom().getId();
+        String messageText = update.getMessage().getText();
+
+        try {
+            // Process the training day normally
+            TrainingDay trainingDay = trainingDayService.processForwardedMessage(userId, messageText);
+            
+            // Add it to the program creation session
+            var session = sessionManager.getSession(userId);
+            session.addTrainingDay(trainingDay);
+            
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(update.getMessage().getChatId().toString());
+            sendMessage.setText("✅ Training day added to your program! (Total: " + 
+                               session.getTrainingDaysCount() + " days)");
+            
+            sendTelegramMessage(sendMessage);
+        } catch (Exception e) {
+            log.error("Error processing forwarded message during program creation for user " + userId, e);
+            
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(update.getMessage().getChatId().toString());
+            sendMessage.setText("❌ Sorry, there was an error adding this training day to your program. Please try again.");
+            
             try {
                 sendTelegramMessage(sendMessage);
             } catch (Exception telegramApiException) {

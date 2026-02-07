@@ -7,3 +7,7 @@ databaseChangeLog:
       file: db/changelog/003-create-exercises-table.yaml
   - include:
       file: db/changelog/004-create-exercise-videos-table.yaml
+  - include:
+      file: db/changelog/005-create-programs-table.yaml
+  - include:
+      file: db/changelog/006-create-program-training-days-table.yaml
