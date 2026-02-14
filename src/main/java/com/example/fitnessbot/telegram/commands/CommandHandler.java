@@ -20,4 +20,8 @@ public interface CommandHandler {
      * @return SendMessage object with the response
      */
     SendMessage handle(Update update);
+
+    String getCommand();
+
+    String getCommandDescription();
 }

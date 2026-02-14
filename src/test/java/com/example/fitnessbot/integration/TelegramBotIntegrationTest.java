@@ -90,7 +90,7 @@ class TelegramBotIntegrationTest extends AbstractWithDbTest {
         // Create command handlers with minimal dependencies for testing instantiation
         java.util.List<com.example.fitnessbot.telegram.commands.CommandHandler> commandHandlers = java.util.List.of(
                 new com.example.fitnessbot.telegram.commands.StartCommandHandler(),
-                new com.example.fitnessbot.telegram.commands.HelpCommandHandler(),
+                new com.example.fitnessbot.telegram.commands.HelpCommandHandler(new com.example.fitnessbot.telegram.commands.CommandRegistryService()),
                 new com.example.fitnessbot.telegram.commands.CreateProgramCommandHandler(null, null),  // Dependencies will be mocked in real usage
                 new com.example.fitnessbot.telegram.commands.FinishProgramCommandHandler(null, null),
                 new com.example.fitnessbot.telegram.commands.CancelProgramCommandHandler(null)

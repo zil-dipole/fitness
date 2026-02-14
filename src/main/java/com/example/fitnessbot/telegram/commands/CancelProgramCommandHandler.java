@@ -10,7 +10,8 @@ import org.telegram.telegrambots.meta.api.objects.Update;
  */
 @Component
 public class CancelProgramCommandHandler implements CommandHandler {
-    
+
+    public static final String COMMAND = "/cancel_program";
     private final ProgramCreationSessionManager sessionManager;
     
     public CancelProgramCommandHandler(ProgramCreationSessionManager sessionManager) {
@@ -19,7 +20,7 @@ public class CancelProgramCommandHandler implements CommandHandler {
     
     @Override
     public boolean canHandle(String command) {
-        return "/cancel_program".equals(command);
+        return COMMAND.equals(command);
     }
     
     @Override
@@ -41,5 +42,15 @@ public class CancelProgramCommandHandler implements CommandHandler {
         response.setChatId(update.getMessage().getChatId().toString());
         response.setText("✅ Program creation cancelled.");
         return response;
+    }
+
+    @Override
+    public String getCommand() {
+        return COMMAND;
+    }
+
+    @Override
+    public String getCommandDescription() {
+        return "Cancel program creation";
     }
 }

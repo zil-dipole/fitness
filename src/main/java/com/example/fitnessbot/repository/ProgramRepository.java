@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface ProgramRepository extends JpaRepository<Program, Long> {
     List<Program> findByUserId(Long userId);
     Optional<Program> findByIdAndUserId(Long id, Long userId);
+    Optional<Program> findFirstByUserIdOrderByCreatedAtDesc(Long userId);
 }

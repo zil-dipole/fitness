@@ -18,15 +18,18 @@ public class ProgramService {
     private final ProgramTrainingDayRepository programTrainingDayRepository;
     private final TrainingDayRepository trainingDayRepository;
     private final UserRepository userRepository;
+    private final ProgramCreationSessionManager sessionManager;
 
     public ProgramService(ProgramRepository programRepository,
                           ProgramTrainingDayRepository programTrainingDayRepository,
                           TrainingDayRepository trainingDayRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          ProgramCreationSessionManager sessionManager) {
         this.programRepository = programRepository;
         this.programTrainingDayRepository = programTrainingDayRepository;
         this.trainingDayRepository = trainingDayRepository;
         this.userRepository = userRepository;
+        this.sessionManager = sessionManager;
     }
 
     /**
@@ -46,7 +49,7 @@ public class ProgramService {
         Program program = new Program();
         program.setUser(user);
         program.setName(programName);
-        
+
         return programRepository.save(program);
     }
 
@@ -60,7 +63,7 @@ public class ProgramService {
     public ProgramTrainingDay addTrainingDayToProgram(Long programId, Long trainingDayId, Integer position) {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new RuntimeException("Program not found with ID: " + programId));
-        
+
         TrainingDay trainingDay = trainingDayRepository.findById(trainingDayId)
                 .orElseThrow(() -> new RuntimeException("Training day not found with ID: " + trainingDayId));
 
@@ -94,5 +97,41 @@ public class ProgramService {
      */
     public Optional<Program> getProgramForUser(Long programId, Long telegramUserId) {
         return programRepository.findByIdAndUserId(programId, telegramUserId);
+    }
+
+    /**
+     * Check if user has an active program creation session
+     * @param telegramUserId Telegram user ID
+     * @return true if user has an active session
+     */
+    public boolean hasActiveSession(Long telegramUserId) {
+        return sessionManager.hasActiveSession(telegramUserId);
+    }
+
+    /**
+     * Get the current program in creation for a user
+     * @param telegramUserId Telegram user ID
+     * @return The program in creation, or null if no active session
+     */
+    public Program getCurrentProgramInCreation(Long telegramUserId) {
+        if (hasActiveSession(telegramUserId)) {
+            return sessionManager.getSession(telegramUserId).getProgram();
+        }
+        return null;
+    }
+    
+    /**
+     * Get the most recently created program for a user (considered as active program)
+     * @param telegramUserId Telegram user ID
+     * @return The most recent program, or null if none exists
+     */
+    public Program getActiveProgram(Long telegramUserId) {
+        Optional<User> optionalUser = userRepository.findByTelegramId(telegramUserId);
+        if (optionalUser.isEmpty()) {
+            return null;
+        }
+        
+        User user = optionalUser.get();
+        return programRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getId()).orElse(null);
     }
 }

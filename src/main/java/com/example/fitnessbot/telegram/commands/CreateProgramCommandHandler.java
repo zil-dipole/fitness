@@ -12,7 +12,8 @@ import org.telegram.telegrambots.meta.api.objects.Update;
  */
 @Component
 public class CreateProgramCommandHandler implements CommandHandler {
-    
+
+    public static final String COMMAND = "/create_program";
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
     
@@ -24,7 +25,7 @@ public class CreateProgramCommandHandler implements CommandHandler {
     
     @Override
     public boolean canHandle(String command) {
-        return command.startsWith("/create_program");
+        return command.startsWith(COMMAND);
     }
     
     @Override
@@ -66,5 +67,15 @@ public class CreateProgramCommandHandler implements CommandHandler {
             response.setText("❌ Sorry, there was an error starting program creation. Please try again.");
             return response;
         }
+    }
+
+    @Override
+    public String getCommand() {
+        return COMMAND;
+    }
+
+    @Override
+    public String getCommandDescription() {
+        return "Create training program";
     }
 }

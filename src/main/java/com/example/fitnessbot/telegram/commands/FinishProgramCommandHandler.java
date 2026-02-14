@@ -1,6 +1,5 @@
 package com.example.fitnessbot.telegram.commands;
 
-import com.example.fitnessbot.model.ProgramTrainingDay;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
@@ -13,7 +12,8 @@ import org.telegram.telegrambots.meta.api.objects.Update;
  */
 @Component
 public class FinishProgramCommandHandler implements CommandHandler {
-    
+
+    public static final String COMMAND = "/finish_program";
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
     
@@ -25,7 +25,7 @@ public class FinishProgramCommandHandler implements CommandHandler {
     
     @Override
     public boolean canHandle(String command) {
-        return "/finish_program".equals(command);
+        return COMMAND.equals(command);
     }
     
     @Override
@@ -74,5 +74,15 @@ public class FinishProgramCommandHandler implements CommandHandler {
             response.setText("❌ Sorry, there was an error finishing program creation. Please try again.");
             return response;
         }
+    }
+
+    @Override
+    public String getCommand() {
+        return COMMAND;
+    }
+
+    @Override
+    public String getCommandDescription() {
+        return "Finish current session of programm creation";
     }
 }
