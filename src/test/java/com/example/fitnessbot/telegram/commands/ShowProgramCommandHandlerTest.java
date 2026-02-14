@@ -14,9 +14,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -59,6 +62,7 @@ class ShowProgramCommandHandlerTest {
         assertEquals("6789", response.getChatId());
         assertTrue(response.getText().contains("You don't have an active program"));
         assertNull(response.getParseMode()); // No markdown for plain text
+        assertNull(response.getReplyMarkup()); // No keyboard for this case
         
         // Verify interactions
         verify(programService).getActiveProgram(12345L);
@@ -89,6 +93,7 @@ class ShowProgramCommandHandlerTest {
         assertEquals("Markdown", response.getParseMode());
         assertTrue(response.getText().contains("*Active Program: My Workout Program*"));
         assertTrue(response.getText().contains("No training days added yet."));
+        assertNull(response.getReplyMarkup()); // No keyboard when no training days
         
         // Verify interactions
         verify(programService).getActiveProgram(12345L);
@@ -140,6 +145,25 @@ class ShowProgramCommandHandlerTest {
         assertTrue(response.getText().contains("Training Days:"));
         assertTrue(response.getText().contains("- Upper Body"));
         assertTrue(response.getText().contains("- Lower Body"));
+        
+        // Verify inline keyboard
+        assertNotNull(response.getReplyMarkup());
+        assertTrue(response.getReplyMarkup() instanceof InlineKeyboardMarkup);
+        
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
+        List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
+        
+        assertEquals(2, keyboard.size()); // Two rows for two training days
+        assertEquals(1, keyboard.get(0).size()); // One button per row
+        assertEquals(1, keyboard.get(1).size()); // One button per row
+        
+        InlineKeyboardButton button1 = keyboard.get(0).get(0);
+        assertEquals("Upper Body", button1.getText());
+        assertEquals("show_day_1", button1.getCallbackData());
+        
+        InlineKeyboardButton button2 = keyboard.get(1).get(0);
+        assertEquals("Lower Body", button2.getText());
+        assertEquals("show_day_2", button2.getCallbackData());
         
         // Verify interactions
         verify(programService).getActiveProgram(12345L);

@@ -3,9 +3,11 @@ package com.example.fitnessbot.telegram;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.telegram.commands.CallbackQueryHandler;
 import com.example.fitnessbot.telegram.commands.CommandHandler;
 import com.example.fitnessbot.telegram.commands.CommandMetadata;
 import com.example.fitnessbot.telegram.commands.CommandRegistryService;
+import com.example.fitnessbot.telegram.commands.ShowDayCommandHandler;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collection;
 
 @Component
 @ConditionalOnProperty(name = "telegram.bot.token")
@@ -37,6 +40,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private final TrainingDayService trainingDayService;
     private final ProgramCreationSessionManager sessionManager;
     private final List<CommandHandler> commandHandlers;
+    private final List<CallbackQueryHandler> callbackQueryHandlers;
     private final CommandRegistryService commandRegistryService;
 
     private final String botUsername;
@@ -44,6 +48,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     public FitnessTelegramBot(TrainingDayService trainingDayService,
                               ProgramCreationSessionManager sessionManager,
                               List<CommandHandler> commandHandlers,
+                              List<CallbackQueryHandler> callbackQueryHandlers,
                               CommandRegistryService commandRegistryService,
                               @Value("${telegram.bot.token:}") String botToken,
                               @Value("${telegram.bot.username:}") String botUsername) {
@@ -51,6 +56,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         this.trainingDayService = trainingDayService;
         this.sessionManager = sessionManager;
         this.commandHandlers = commandHandlers;
+        this.callbackQueryHandlers = callbackQueryHandlers;
         this.commandRegistryService = commandRegistryService;
         this.botUsername = botUsername;
     }
@@ -107,6 +113,27 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         Long chatId = callbackQuery.getMessage().getChatId();
 
         try {
+            // First, try to handle with registered callback query handlers
+            for (CallbackQueryHandler handler : callbackQueryHandlers) {
+                if (handler.canHandle(callbackQuery)) {
+                    SendMessage message = handler.handle(new Update() {{
+                        setCallbackQuery(callbackQuery);
+                    }});
+                    
+                    sendTelegramMessage(message);
+                    
+                    // Acknowledge the callback query to remove loading indicator
+                    if (callbackQuery.getId() != null) {
+                        AnswerCallbackQuery answer = new AnswerCallbackQuery();
+                        answer.setCallbackQueryId(callbackQuery.getId());
+                        execute(answer);
+                    }
+                    
+                    return;
+                }
+            }
+            
+            // If no handler matched, use the default handling
             SendMessage message = new SendMessage();
             message.setChatId(chatId.toString());
 
@@ -161,10 +188,31 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             if (callbackQuery.getId() != null) {
                 AnswerCallbackQuery answer = new AnswerCallbackQuery();
                 answer.setCallbackQueryId(callbackQuery.getId());
-                execute(answer);
+                // Skip actual Telegram API calls during testing
+                if (!"true".equals(System.getProperty("test.profile"))) {
+                    execute(answer);
+                }
             }
         } catch (Exception e) {
             log.error("Error handling callback query: {}", callbackData, e);
+            try {
+                SendMessage errorMessage = new SendMessage();
+                errorMessage.setChatId(chatId.toString());
+                errorMessage.setText("Sorry, there was an error processing your request. Please try again.");
+                sendTelegramMessage(errorMessage);
+
+                // Acknowledge the callback query even in case of error
+                if (callbackQuery.getId() != null) {
+                    AnswerCallbackQuery answer = new AnswerCallbackQuery();
+                    answer.setCallbackQueryId(callbackQuery.getId());
+                    // Skip actual Telegram API calls during testing
+                    if (!"true".equals(System.getProperty("test.profile"))) {
+                        execute(answer);
+                    }
+                }
+            } catch (Exception telegramException) {
+                log.error("Failed to send error message for callback query: {}", callbackData, telegramException);
+            }
         }
     }
 

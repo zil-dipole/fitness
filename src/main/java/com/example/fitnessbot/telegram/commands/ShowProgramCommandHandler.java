@@ -1,12 +1,18 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.model.Program;
+import com.example.fitnessbot.model.ProgramTrainingDay;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Handler for the /show_program command
@@ -48,8 +54,24 @@ public class ShowProgramCommandHandler implements CommandHandler {
             // Get training days for the program
             if (activeProgram.getProgramTrainingDays() != null && !activeProgram.getProgramTrainingDays().isEmpty()) {
                 response.append("Training Days:\n");
-                activeProgram.getProgramTrainingDays().forEach(ptd -> 
-                    response.append("- ").append(ptd.getTrainingDay().getTitle()).append("\n"));
+                
+                // Create inline keyboard markup for training days
+                InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+                List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+                
+                for (ProgramTrainingDay ptd : activeProgram.getProgramTrainingDays()) {
+                    List<InlineKeyboardButton> row = new ArrayList<>();
+                    InlineKeyboardButton button = new InlineKeyboardButton();
+                    button.setText(ptd.getTrainingDay().getTitle());
+                    button.setCallbackData("show_day_" + ptd.getTrainingDay().getId());
+                    row.add(button);
+                    rows.add(row);
+                    
+                    response.append("- ").append(ptd.getTrainingDay().getTitle()).append("\n");
+                }
+                
+                markup.setKeyboard(rows);
+                sendMessage.setReplyMarkup(markup);
             } else {
                 response.append("No training days added yet.\n");
             }

@@ -73,4 +73,13 @@ public class TrainingDayService {
 
         return savedTrainingDay;
     }
+    
+    /**
+     * Get a training day by its ID
+     * @param id The ID of the training day
+     * @return The training day, or null if not found
+     */
+    public TrainingDay getTrainingDayById(Long id) {
+        return trainingDayRepository.findById(id).orElse(null);
+    }
 }
