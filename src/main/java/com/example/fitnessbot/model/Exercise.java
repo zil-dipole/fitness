@@ -5,6 +5,10 @@ import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Represents an exercise within a training day.
+ * Exercises have a position, section, name, sets, reps/duration, videos, and notes.
+ */
 @Entity
 @Table(name = "exercises")
 public class Exercise {
@@ -38,7 +42,6 @@ public class Exercise {
     @Column(name = "last_weight_kg")
     private Double lastWeightKg;
 
-    // Getters and setters
     public Long getId() {
         return id;
     }
@@ -47,74 +50,146 @@ public class Exercise {
         this.id = id;
     }
 
+    /**
+     * Gets the training day this exercise belongs to.
+     * @return the training day
+     */
     public TrainingDay getTrainingDay() {
         return trainingDay;
     }
 
+    /**
+     * Sets the training day this exercise belongs to.
+     * @param trainingDay the training day to set
+     */
     public void setTrainingDay(TrainingDay trainingDay) {
         this.trainingDay = trainingDay;
     }
 
+    /**
+     * Gets the position of this exercise within the training day.
+     * @return the position
+     */
     public Integer getPosition() {
         return position;
     }
 
+    /**
+     * Sets the position of this exercise within the training day.
+     * @param position the position to set
+     */
     public void setPosition(Integer position) {
         this.position = position;
     }
 
+    /**
+     * Gets the section this exercise belongs to.
+     * @return the section
+     */
     public String getSection() {
         return section;
     }
 
+    /**
+     * Sets the section this exercise belongs to.
+     * @param section the section to set
+     */
     public void setSection(String section) {
         this.section = section;
     }
 
+    /**
+     * Gets the name of this exercise.
+     * @return the name
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * Sets the name of this exercise.
+     * @param name the name to set
+     */
     public void setName(String name) {
         this.name = name;
     }
 
+    /**
+     * Gets the number of sets for this exercise.
+     * @return the number of sets, or null if not specified
+     */
     public Integer getSets() {
         return sets;
     }
 
+    /**
+     * Sets the number of sets for this exercise.
+     * @param sets the number of sets to set
+     */
     public void setSets(Integer sets) {
         this.sets = sets;
     }
 
+    /**
+     * Gets the reps or duration for this exercise.
+     * @return the reps or duration
+     */
     public String getRepsOrDuration() {
         return repsOrDuration;
     }
 
+    /**
+     * Sets the reps or duration for this exercise.
+     * @param repsOrDuration the reps or duration to set
+     */
     public void setRepsOrDuration(String repsOrDuration) {
         this.repsOrDuration = repsOrDuration;
     }
 
+    /**
+     * Gets the list of video URLs for this exercise.
+     * @return the list of video URLs
+     */
     public List<String> getVideoUrls() {
         return videoUrls;
     }
 
+    /**
+     * Sets the list of video URLs for this exercise.
+     * @param videoUrls the list of video URLs to set
+     */
     public void setVideoUrls(List<String> videoUrls) {
         this.videoUrls = videoUrls;
     }
 
+    /**
+     * Gets the notes for this exercise.
+     * @return the notes
+     */
     public String getNotes() {
         return notes;
     }
 
+    /**
+     * Sets the notes for this exercise.
+     * @param notes the notes to set
+     */
     public void setNotes(String notes) {
         this.notes = notes;
     }
 
+    /**
+     * Gets the last weight used for this exercise.
+     * @return the last weight in kg, or null if not set
+     */
     public Double getLastWeightKg() {
         return lastWeightKg;
     }
 
+    /**
+     * Sets the last weight used for this exercise.
+     * @param lastWeightKg the last weight to set
+     */
     public void setLastWeightKg(Double lastWeightKg) {
         this.lastWeightKg = lastWeightKg;
     }

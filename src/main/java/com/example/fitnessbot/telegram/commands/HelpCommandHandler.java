@@ -1,5 +1,6 @@
 package com.example.fitnessbot.telegram.commands;
 
+import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,10 +16,13 @@ public class HelpCommandHandler implements CommandHandler {
 
     public static final String COMMAND = "/help";
     private final CommandRegistryService commandRegistryService;
+    private final MenuKeyboardFactory menuKeyboardFactory;
 
     @Autowired
-    public HelpCommandHandler(CommandRegistryService commandRegistryService) {
+    public HelpCommandHandler(CommandRegistryService commandRegistryService,
+                             MenuKeyboardFactory menuKeyboardFactory) {
         this.commandRegistryService = commandRegistryService;
+        this.menuKeyboardFactory = menuKeyboardFactory;
     }
 
     @Override
@@ -30,7 +34,7 @@ public class HelpCommandHandler implements CommandHandler {
     public SendMessage handle(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        
+
         // Build help text using command registry
         StringBuilder helpText = new StringBuilder();
         helpText.append("Simply forward your workout program messages to me and I'll parse and save them.\n\n");
@@ -39,25 +43,27 @@ public class HelpCommandHandler implements CommandHandler {
         helpText.append("- Exercises with bullet points ('⁃' or '-')\n");
         helpText.append("- Sets and reps like \"3 x 10\"\n");
         helpText.append("- Video links\n\n");
-        
+
         helpText.append("Available Commands:\n");
         List<CommandMetadata> commands = commandRegistryService.getAllCommands();
         for (CommandMetadata cmd : commands) {
             helpText.append(String.format("- %s - %s\n", cmd.getCommand(), cmd.getDescription()));
-            if (cmd.getUsageExample() != null && !cmd.getUsageExample().isEmpty() && 
+            if (cmd.getUsageExample() != null && !cmd.getUsageExample().isEmpty() &&
                 !cmd.getUsageExample().equals(cmd.getCommand())) {
                 helpText.append(String.format("  Example: %s\n", cmd.getUsageExample()));
             }
         }
-        
+
         helpText.append("\nTip: Type \"/\" to see all available commands or start typing a command for suggestions!\n\n");
-        
+
         helpText.append("Example program format:\n");
         helpText.append("Upper Body:\n");
         helpText.append("- Bench Press 3 x 10 (Warm up set)\n");
         helpText.append("- https://youtube.com/watch?v=example");
-        
+
         sendMessage.setText(helpText.toString());
+        // Add menu keyboard to help message
+        sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(update.getMessage().getFrom().getId()));
         return sendMessage;
     }
 

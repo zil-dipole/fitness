@@ -14,33 +14,33 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 public class ProgramCreationSessionManager {
-    
+
     // Maps userId to their current program creation session
     private final Map<Long, ProgramCreationSession> sessions = new ConcurrentHashMap<>();
-    
+
     public void startSession(Long userId, Program program) {
         sessions.put(userId, new ProgramCreationSession(program));
     }
-    
+
     public ProgramCreationSession getSession(Long userId) {
         return sessions.get(userId);
     }
-    
+
     public void endSession(Long userId) {
         sessions.remove(userId);
     }
-    
+
     public boolean hasActiveSession(Long userId) {
         return sessions.containsKey(userId);
     }
-    
+
     /**
      * Represents an ongoing program creation session
      */
     public static class ProgramCreationSession {
         private final Program program;
-        private final Map<Long, TrainingDay> trainingDays = new HashMap<>();
-        
+        private final Map<Long, TrainingDay> trainingDays = new ConcurrentHashMap<>();
+
         public ProgramCreationSession(Program program) {
             this.program = program;
         }

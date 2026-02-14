@@ -1,8 +1,12 @@
 package com.example.fitnessbot.telegram.commands;
 
+import com.example.fitnessbot.exception.FitnessBotException;
+import com.example.fitnessbot.exception.ProgramException;
+import com.example.fitnessbot.exception.TrainingDayException;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -16,11 +20,14 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
     public static final String COMMAND = "/finish_program";
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
+    private final MenuKeyboardFactory menuKeyboardFactory;
 
     public FinishProgramCommandHandler(ProgramService programService,
-                                      ProgramCreationSessionManager sessionManager) {
+                                      ProgramCreationSessionManager sessionManager,
+                                      MenuKeyboardFactory menuKeyboardFactory) {
         this.programService = programService;
         this.sessionManager = sessionManager;
+        this.menuKeyboardFactory = menuKeyboardFactory;
     }
 
     @Override
@@ -80,6 +87,13 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
             response.setChatId(update.getMessage().getChatId().toString());
             response.setText("✅ Program \"" + program.getName() + "\" created successfully!\n" +
                           "Added " + trainingDays.size() + " training days to the program.");
+            // Send updated menu after finishing program
+            response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
+            return response;
+        } catch (ProgramException | TrainingDayException e) {
+            SendMessage response = new SendMessage();
+            response.setChatId(update.getMessage().getChatId().toString());
+            response.setText("❌ " + e.getMessage());
             return response;
         } catch (Exception e) {
             SendMessage response = new SendMessage();
@@ -96,6 +110,6 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Finish current session of programm creation";
+        return "Finish creating current program";
     }
 }

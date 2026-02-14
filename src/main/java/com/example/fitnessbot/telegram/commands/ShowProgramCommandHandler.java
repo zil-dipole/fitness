@@ -1,17 +1,14 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.model.Program;
-import com.example.fitnessbot.model.ProgramTrainingDay;
+import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -23,9 +20,11 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
     public static final String COMMAND = "/show_program";
 
     private final ProgramService programService;
+    private final ProgramCreationSessionManager sessionManager;
 
-    public ShowProgramCommandHandler(ProgramService programService) {
+    public ShowProgramCommandHandler(ProgramService programService, ProgramCreationSessionManager sessionManager) {
         this.programService = programService;
+        this.sessionManager = sessionManager;
     }
 
     @Override
@@ -35,15 +34,15 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public boolean isAvailable(Long userId, ProgramCreationSessionManager sessionManager) {
-        // Show program is available if user has an active program or active session
-        return programService.getActiveProgram(userId) != null || sessionManager.hasActiveSession(userId);
+        // Show program is available if user has an active session
+        return sessionManager.hasActiveSession(userId);
     }
 
     @Override
     public SendMessage handleUnavailable(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        sendMessage.setText("You don't have an active program or program creation session. Start one with /create_program <name>");
+        sendMessage.setText("You don't have an active program creation session. Start one with /create_program <name>");
         return sendMessage;
     }
 
@@ -54,45 +53,38 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         sendMessage.setChatId(update.getMessage().getChatId().toString());
 
         Long telegramUserId = update.getMessage().getFrom().getId();
-
-        // Check if user has an active program
-        Program activeProgram = programService.getActiveProgram(telegramUserId);
         
-        if (activeProgram != null) {
-            StringBuilder response = new StringBuilder();
-            response.append("*Active Program: ").append(activeProgram.getName()).append("*\n\n");
+        StringBuilder response = new StringBuilder();
 
-            // Get training days for the program
-            if (activeProgram.getProgramTrainingDays() != null && !activeProgram.getProgramTrainingDays().isEmpty()) {
-                response.append("Training Days:\n");
+        // Check if user has an active session
+        var session = sessionManager.getSession(telegramUserId);
+        if (session != null) {
+            Program program = session.getProgram();
+            response.append("*Program Creation Session: ").append(program.getName()).append("*\n\n");
+            
+            // Get training days from the session
+            List<TrainingDay> trainingDays = session.getTrainingDays();
+            if (!trainingDays.isEmpty()) {
+                response.append("Training Days Added:\n");
                 
-                // Create inline keyboard markup for training days
-                InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-                List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-                
-                for (ProgramTrainingDay ptd : activeProgram.getProgramTrainingDays()) {
-                    List<InlineKeyboardButton> row = new ArrayList<>();
-                    InlineKeyboardButton button = new InlineKeyboardButton();
-                    button.setText(ptd.getTrainingDay().getTitle());
-                    button.setCallbackData("show_day_" + ptd.getTrainingDay().getId());
-                    row.add(button);
-                    rows.add(row);
-                    
-                    response.append("- ").append(ptd.getTrainingDay().getTitle()).append("\n");
+                for (TrainingDay trainingDay : trainingDays) {
+                    response.append("- ").append(trainingDay.getTitle()).append("\n");
                 }
                 
-                markup.setKeyboard(rows);
-                sendMessage.setReplyMarkup(markup);
+                response.append("\nTotal: ").append(trainingDays.size()).append(" training days");
             } else {
                 response.append("No training days added yet.\n");
+                response.append("Forward training day messages to add them to this program.");
             }
-
-            sendMessage.setText(response.toString());
+            
+            // Set markdown for formatted response
             sendMessage.setParseMode("Markdown");
         } else {
-            sendMessage.setText("You don't have an active program. Start one with /create_program <name>");
+            response.append("You don't have an active program creation session. Start one with /create_program <name>");
+            // No markdown for plain text response
         }
 
+        sendMessage.setText(response.toString());
         return sendMessage;
     }
 
@@ -103,6 +95,6 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Show details of the current active program";
+        return "Show details of the current program being created";
     }
 }

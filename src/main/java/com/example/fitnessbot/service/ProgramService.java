@@ -1,5 +1,7 @@
 package com.example.fitnessbot.service;
 
+import com.example.fitnessbot.exception.ProgramException;
+import com.example.fitnessbot.exception.TrainingDayException;
 import com.example.fitnessbot.model.*;
 import com.example.fitnessbot.repository.ProgramRepository;
 import com.example.fitnessbot.repository.ProgramTrainingDayRepository;
@@ -37,20 +39,25 @@ public class ProgramService {
      * @param telegramUserId Telegram user ID
      * @param programName Name of the program
      * @return The created program
+     * @throws ProgramException if there's an error creating the program
      */
-    public Program startProgramCreation(Long telegramUserId, String programName) {
-        User user = userRepository.findByTelegramId(telegramUserId)
-                .orElseGet(() -> {
-                    User newUser = new User();
-                    newUser.setTelegramId(telegramUserId);
-                    return userRepository.save(newUser);
-                });
+    public Program startProgramCreation(Long telegramUserId, String programName) throws ProgramException {
+        try {
+            User user = userRepository.findByTelegramId(telegramUserId)
+                    .orElseGet(() -> {
+                        User newUser = new User();
+                        newUser.setTelegramId(telegramUserId);
+                        return userRepository.save(newUser);
+                    });
 
-        Program program = new Program();
-        program.setUser(user);
-        program.setName(programName);
+            Program program = new Program();
+            program.setUser(user);
+            program.setName(programName);
 
-        return programRepository.save(program);
+            return programRepository.save(program);
+        } catch (Exception e) {
+            throw new ProgramException("Error creating program: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -59,17 +66,20 @@ public class ProgramService {
      * @param trainingDayId ID of the training day to add
      * @param position Position in the program
      * @return The ProgramTrainingDay entity that links them
+     * @throws ProgramException if program is not found or training day doesn't belong to same user
+     * @throws TrainingDayException if training day is not found
      */
-    public ProgramTrainingDay addTrainingDayToProgram(Long programId, Long trainingDayId, Integer position) {
+    public ProgramTrainingDay addTrainingDayToProgram(Long programId, Long trainingDayId, Integer position) 
+            throws ProgramException, TrainingDayException {
         Program program = programRepository.findById(programId)
-                .orElseThrow(() -> new RuntimeException("Program not found with ID: " + programId));
+                .orElseThrow(() -> new ProgramException("Program not found with ID: " + programId));
 
         TrainingDay trainingDay = trainingDayRepository.findById(trainingDayId)
-                .orElseThrow(() -> new RuntimeException("Training day not found with ID: " + trainingDayId));
+                .orElseThrow(() -> new TrainingDayException("Training day not found with ID: " + trainingDayId));
 
         // Check that the training day belongs to the same user as the program
         if (!program.getUser().getId().equals(trainingDay.getUser().getId())) {
-            throw new RuntimeException("Training day does not belong to the same user as the program");
+            throw new ProgramException("Training day does not belong to the same user as the program");
         }
 
         ProgramTrainingDay programTrainingDay = new ProgramTrainingDay();

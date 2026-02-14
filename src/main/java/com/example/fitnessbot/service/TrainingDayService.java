@@ -8,7 +8,9 @@ import com.example.fitnessbot.repository.ExerciseRepository;
 import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,8 +38,21 @@ public class TrainingDayService {
      * @param telegramUserId Telegram chat identifier
      * @param rawText the full forwarded message containing the workout description
      * @return the persisted TrainingDay entity (or its id)
+     * @throws IllegalArgumentException if the input is invalid
      */
+    @Transactional
     public TrainingDay processForwardedMessage(Long telegramUserId, String rawText) {
+        // Validate input
+        if (telegramUserId == null) {
+            throw new IllegalArgumentException("Telegram user ID cannot be null");
+        }
+        if (rawText == null || rawText.trim().isEmpty()) {
+            throw new IllegalArgumentException("Raw text cannot be null or empty");
+        }
+        // Limit input size to prevent abuse
+        if (rawText.length() > 10000) { // 10KB limit
+            throw new IllegalArgumentException("Raw text is too large (max 10KB allowed)");
+        }
         // 1. Find or create the user
         User user = userRepository.findByTelegramId(telegramUserId)
                 .orElseGet(() -> {
@@ -63,9 +78,13 @@ public class TrainingDayService {
         // 5. Set the training day reference for exercises before saving
         List<Exercise> exercises = parsedTrainingDay.getExercises();
         if (exercises != null) {
-            for (Exercise exercise : exercises) {
+            // Create a new list to avoid modifying the potentially lazy-loaded collection directly
+            List<Exercise> exerciseList = new ArrayList<>(exercises);
+            for (Exercise exercise : exerciseList) {
                 exercise.setTrainingDay(parsedTrainingDay);
             }
+            // Set the modified list back to the training day
+            parsedTrainingDay.setExercises(exerciseList);
         }
 
         // 6. Save the training day (this will cascade to exercises)

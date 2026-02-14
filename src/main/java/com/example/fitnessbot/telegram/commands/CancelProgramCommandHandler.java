@@ -1,6 +1,7 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -13,9 +14,12 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
 
     public static final String COMMAND = "/cancel_program";
     private final ProgramCreationSessionManager sessionManager;
+    private final MenuKeyboardFactory menuKeyboardFactory;
 
-    public CancelProgramCommandHandler(ProgramCreationSessionManager sessionManager) {
+    public CancelProgramCommandHandler(ProgramCreationSessionManager sessionManager,
+                                      MenuKeyboardFactory menuKeyboardFactory) {
         this.sessionManager = sessionManager;
+        this.menuKeyboardFactory = menuKeyboardFactory;
     }
 
     @Override
@@ -54,6 +58,8 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
         response.setText("✅ Program creation cancelled.");
+        // Send updated menu after cancelling program
+        response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
         return response;
     }
 

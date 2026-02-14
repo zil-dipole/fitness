@@ -31,15 +31,19 @@ import java.util.ArrayList;
 
 @Component
 @ConditionalOnProperty(name = "telegram.bot.token")
-public class FitnessTelegramBot extends TelegramLongPollingBot {
+public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKeyboardFactory {
 
     private static final Logger log = LoggerFactory.getLogger(FitnessTelegramBot.class);
+
+    // Number of commands to display per row in the command keyboard
+    private static final int COMMANDS_PER_ROW = 2;
 
     private final TrainingDayService trainingDayService;
     private final ProgramCreationSessionManager sessionManager;
     private final List<CommandHandler> commandHandlers;
     private final List<CallbackQueryHandler> callbackQueryHandlers;
     private final CommandRegistryService commandRegistryService;
+    private final MenuKeyboardFactory menuKeyboardFactory;
 
     private final String botUsername;
 
@@ -48,6 +52,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                               List<CommandHandler> commandHandlers,
                               List<CallbackQueryHandler> callbackQueryHandlers,
                               CommandRegistryService commandRegistryService,
+                              MenuKeyboardFactory menuKeyboardFactory,
                               @Value("${telegram.bot.token:}") String botToken,
                               @Value("${telegram.bot.username:}") String botUsername) {
         super(botToken);
@@ -56,29 +61,16 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         this.commandHandlers = commandHandlers;
         this.callbackQueryHandlers = callbackQueryHandlers;
         this.commandRegistryService = commandRegistryService;
+        this.menuKeyboardFactory = menuKeyboardFactory;
         this.botUsername = botUsername;
     }
 
 
     @PostConstruct
     public void registerCommands() {
-        // Only register commands when not in test environment
-        if (!"true".equals(System.getProperty("test.profile"))) {
-            try {
-                List<BotCommand> botCommands = commandHandlers.stream()
-                        .map(handler -> new BotCommand(handler.getCommand(), handler.getCommandDescription()))
-                        .toList();
-
-                SetMyCommands setMyCommands = new SetMyCommands();
-
-                setMyCommands.setCommands(botCommands);
-                setMyCommands.setScope(new BotCommandScopeDefault());
-
-                execute(setMyCommands);
-            } catch (TelegramApiException e) {
-                log.error("Failed to register bot commands", e);
-            }
-        }
+        // We don't register global commands to avoid showing contextually inappropriate commands
+        // Instead, we rely on context-aware keyboards and direct command handling
+        log.info("Bot initialized without global command registration for context-sensitive behavior");
     }
     
     @Override
@@ -139,17 +131,48 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             switch (callbackData) {
                 case "create_program":
                     message.setText("To create a program, use the /create_program <name> command.\nExample: /create_program My Workout Plan");
+                    // Add menu keyboard to create program message
+                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
                     break;
                 case "view_programs":
                     message.setText("To view your programs, this feature will be implemented soon!");
+                    // Add menu keyboard to view programs message
+                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
                     break;
                 case "cancel_program":
                     Long userId = callbackQuery.getFrom().getId();
                     if (sessionManager.hasActiveSession(userId)) {
                         sessionManager.endSession(userId);
                         message.setText("✅ Program creation cancelled.");
+                        // Send updated menu after cancelling
+                        message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
                     } else {
                         message.setText("You don't have an active program creation session to cancel.");
+                    }
+                    break;
+                case "finish_program":
+                    Long finishUserId = callbackQuery.getFrom().getId();
+                    if (sessionManager.hasActiveSession(finishUserId)) {
+                        // Create a fake update to simulate the /finish_program command being sent
+                        Update fakeUpdate = new Update();
+                        org.telegram.telegrambots.meta.api.objects.Message fakeMessage = new org.telegram.telegrambots.meta.api.objects.Message();
+                        fakeMessage.setText("/finish_program");
+
+                        if (callbackQuery.getMessage() instanceof org.telegram.telegrambots.meta.api.objects.Message originalMessage) {
+                            fakeMessage.setChat(originalMessage.getChat());
+                        }
+
+                        fakeMessage.setFrom(callbackQuery.getFrom());
+                        fakeUpdate.setMessage(fakeMessage);
+                        fakeUpdate.setUpdateId(1); // Set a dummy update ID
+
+                        // Handle the command
+                        handleCommand(fakeUpdate);
+                        
+                        // Return early since we've handled the command
+                        return;
+                    } else {
+                        message.setText("You don't have an active program creation session. Start one with /create_program <program_name>");
                     }
                     break;
                 case "help":
@@ -172,10 +195,12 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                             Upper Body:
                             - Bench Press 3 x 10 (Warm up set)
                             - https://youtube.com/watch?v=example""");
+                    // Add menu keyboard to help message
+                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
                     break;
                 case "start_menu":
                     message.setText("Welcome to Fitness Bot! Choose an option below:");
-                    message.setReplyMarkup(createMainMenuKeyboard(callbackQuery.getFrom().getId()));
+                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
                     break;
                 default:
                     // Handle command suggestions (new functionality)
@@ -192,13 +217,11 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             // Acknowledge the callback query to remove loading indicator
             // Only if callbackQueryId is not null (e.g., in real Telegram environment)
-            if (callbackQuery.getId() != null) {
+            // Skip actual Telegram API calls during testing
+            if (callbackQuery.getId() != null && !"true".equals(System.getProperty("test.profile"))) {
                 AnswerCallbackQuery answer = new AnswerCallbackQuery();
                 answer.setCallbackQueryId(callbackQuery.getId());
-                // Skip actual Telegram API calls during testing
-                if (!"true".equals(System.getProperty("test.profile"))) {
-                    execute(answer);
-                }
+                execute(answer);
             }
         } catch (Exception e) {
             log.error("Error handling callback query: {}", callbackData, e);
@@ -209,16 +232,15 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 sendTelegramMessage(errorMessage);
 
                 // Acknowledge the callback query even in case of error
-                if (callbackQuery.getId() != null) {
+                // Skip actual Telegram API calls during testing
+                if (callbackQuery.getId() != null && !"true".equals(System.getProperty("test.profile"))) {
                     AnswerCallbackQuery answer = new AnswerCallbackQuery();
                     answer.setCallbackQueryId(callbackQuery.getId());
-                    // Skip actual Telegram API calls during testing
-                    if (!"true".equals(System.getProperty("test.profile"))) {
-                        execute(answer);
-                    }
+                    execute(answer);
                 }
             } catch (Exception telegramException) {
-                log.error("Failed to send error message for callback query: {}", callbackData, telegramException);
+                log.warn("Failed to acknowledge callback query: {} for callback data: {}. Error: {}", 
+                        callbackQuery.getId(), callbackData, telegramException.getMessage());
             }
         }
     }
@@ -231,10 +253,18 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         String command = callbackData.substring(4); // Remove "cmd:" prefix
 
         // Acknowledge the callback query
-        AnswerCallbackQuery answer = new AnswerCallbackQuery();
-        answer.setCallbackQueryId(callbackQuery.getId());
-        answer.setText("Executing: " + command);
-        execute(answer);
+        // Skip actual Telegram API calls during testing
+        if (callbackQuery.getId() != null && !"true".equals(System.getProperty("test.profile"))) {
+            try {
+                AnswerCallbackQuery answer = new AnswerCallbackQuery();
+                answer.setCallbackQueryId(callbackQuery.getId());
+                answer.setText("Executing: " + command);
+                execute(answer);
+            } catch (Exception e) {
+                log.warn("Failed to acknowledge command suggestion callback query: {} for command: {}. Error: {}", 
+                        callbackQuery.getId(), command, e.getMessage());
+            }
+        }
 
         // Create a fake update to simulate the command being sent
         Update fakeUpdate = new Update();
@@ -259,32 +289,44 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
      *
      * @param userId The user ID to determine if they have an active session
      */
-    private InlineKeyboardMarkup createMainMenuKeyboard(Long userId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+    public MenuKeyboardFactory getMenuKeyboardFactory() {
+        return this;
+    }
 
-        // First row - Create Program and View Programs
-        List<InlineKeyboardButton> firstRow = new ArrayList<>();
-        InlineKeyboardButton createProgramBtn = new InlineKeyboardButton();
-        createProgramBtn.setText("Create Program");
-        createProgramBtn.setCallbackData("create_program");
-        firstRow.add(createProgramBtn);
+    /**
+     * Create the main menu inline keyboard
 
-        InlineKeyboardButton viewProgramsBtn = new InlineKeyboardButton();
-        viewProgramsBtn.setText("View Programs");
-        viewProgramsBtn.setCallbackData("view_programs");
-        firstRow.add(viewProgramsBtn);
+        // First row - Create Program (only shown when no active session)
+        if (!sessionManager.hasActiveSession(userId)) {
+            List<InlineKeyboardButton> firstRow = new ArrayList<>();
+            InlineKeyboardButton createProgramBtn = new InlineKeyboardButton();
+            createProgramBtn.setText("Create Program");
+            createProgramBtn.setCallbackData("create_program");
+            firstRow.add(createProgramBtn);
 
-        rows.add(firstRow);
+            InlineKeyboardButton viewProgramsBtn = new InlineKeyboardButton();
+            viewProgramsBtn.setText("View Programs");
+            viewProgramsBtn.setCallbackData("view_programs");
+            firstRow.add(viewProgramsBtn);
 
-        // Check if user has an active session to show cancel button
+            rows.add(firstRow);
+        }
+
+        // Cancel/Finish Program (only shown when active session exists)
         if (sessionManager.hasActiveSession(userId)) {
-            List<InlineKeyboardButton> cancelRow = new ArrayList<>();
+            List<InlineKeyboardButton> sessionControlRow = new ArrayList<>();
+            
+            InlineKeyboardButton finishProgramBtn = new InlineKeyboardButton();
+            finishProgramBtn.setText("Finish Program");
+            finishProgramBtn.setCallbackData("finish_program");
+            sessionControlRow.add(finishProgramBtn);
+            
             InlineKeyboardButton cancelProgramBtn = new InlineKeyboardButton();
             cancelProgramBtn.setText("Cancel Program");
             cancelProgramBtn.setCallbackData("cancel_program");
-            cancelRow.add(cancelProgramBtn);
-            rows.add(cancelRow);
+            sessionControlRow.add(cancelProgramBtn);
+            
+            rows.add(sessionControlRow);
         }
 
         // Last row - Help
@@ -321,12 +363,36 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     trainingDay.getExercises().size() + " exercises.");
 
             sendTelegramMessage(sendMessage);
-        } catch (Exception e) {
-            log.error("Error processing forwarded message from user " + userId, e);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid input when processing forwarded message from user {}: {}", userId, e.getMessage());
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Sorry, there was an error processing your training program. Please try again.");
+            sendMessage.setText("❌ Invalid input: " + e.getMessage());
+
+            try {
+                sendTelegramMessage(sendMessage);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send error message to user", telegramApiException);
+            }
+        } catch (org.springframework.dao.DataAccessException e) {
+            log.error("Database error when processing forwarded message from user " + userId, e);
+
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(update.getMessage().getChatId().toString());
+            sendMessage.setText("❌ Sorry, there was a database error processing your training program. Please try again.");
+
+            try {
+                sendTelegramMessage(sendMessage);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send error message to user", telegramApiException);
+            }
+        } catch (Exception e) {
+            log.error("Unexpected error processing forwarded message from user " + userId, e);
+
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(update.getMessage().getChatId().toString());
+            sendMessage.setText("❌ Sorry, there was an unexpected error processing your training program. Please try again.");
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -439,12 +505,32 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
      * Show all available commands when user types just "/"
      */
     private void showAllCommands(Update update) {
+        Long userId = update.getMessage().getFrom().getId();
         SendMessage message = new SendMessage();
         message.setChatId(update.getMessage().getChatId().toString());
         message.setText("📋 Available commands:");
 
-        // Create inline keyboard with all commands
-        InlineKeyboardMarkup markup = createCommandKeyboard(commandRegistryService.getAllCommands());
+        // Filter commands to only include available commands for context-aware handlers
+        List<CommandMetadata> availableCommands = commandRegistryService.getAllCommands().stream()
+                .filter(cmd -> {
+                    // Find the handler for this command
+                    CommandHandler handler = commandHandlers.stream()
+                            .filter(h -> h.canHandle(cmd.getCommand()))
+                            .findFirst()
+                            .orElse(null);
+
+                    // If it's a context-aware handler, check if it's available
+                    if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
+                        return contextAwareHandler.isAvailable(userId, sessionManager);
+                    }
+
+                    // Non-context-aware commands are always available
+                    return true;
+                })
+                .toList();
+
+        // Create inline keyboard with available commands
+        InlineKeyboardMarkup markup = createCommandKeyboard(availableCommands);
         message.setReplyMarkup(markup);
 
         try {
@@ -474,12 +560,12 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                             .filter(h -> h.canHandle(cmd.getCommand()))
                             .findFirst()
                             .orElse(null);
-                    
+
                     // If it's a context-aware handler, check if it's available
                     if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
                         return contextAwareHandler.isAvailable(userId, sessionManager);
                     }
-                    
+
                     // Non-context-aware commands are always available
                     return true;
                 })
@@ -520,8 +606,8 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        // Create rows with 2 commands per row
-        for (int i = 0; i < commands.size(); i += 2) {
+        // Create rows with COMMANDS_PER_ROW commands per row
+        for (int i = 0; i < commands.size(); i += COMMANDS_PER_ROW) {
             List<InlineKeyboardButton> row = new ArrayList<>();
 
             // First command in row
@@ -530,12 +616,12 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             button1.setCallbackData("cmd:" + commands.get(i).getCommand());
             row.add(button1);
 
-            // Second command in row (if exists)
-            if (i + 1 < commands.size()) {
-                InlineKeyboardButton button2 = new InlineKeyboardButton();
-                button2.setText(commands.get(i + 1).getCommand());
-                button2.setCallbackData("cmd:" + commands.get(i + 1).getCommand());
-                row.add(button2);
+            // Additional commands in row (if exist)
+            for (int j = 1; j < COMMANDS_PER_ROW && i + j < commands.size(); j++) {
+                InlineKeyboardButton button = new InlineKeyboardButton();
+                button.setText(commands.get(i + j).getCommand());
+                button.setCallbackData("cmd:" + commands.get(i + j).getCommand());
+                row.add(button);
             }
 
             rows.add(row);
@@ -551,7 +637,17 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     protected void sendTelegramMessage(SendMessage sendMessage) throws Exception {
         // Skip actual Telegram API calls during testing
         if (!"true".equals(System.getProperty("test.profile"))) {
-            execute(sendMessage);
+            try {
+                execute(sendMessage);
+            } catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException e) {
+                log.error("Telegram API error when sending message to chat {}: {}", 
+                         sendMessage.getChatId(), e.getMessage(), e);
+                throw e;
+            } catch (Exception e) {
+                log.error("Unexpected error when sending message to chat {}: {}", 
+                         sendMessage.getChatId(), e.getMessage(), e);
+                throw e;
+            }
         }
     }
 }
