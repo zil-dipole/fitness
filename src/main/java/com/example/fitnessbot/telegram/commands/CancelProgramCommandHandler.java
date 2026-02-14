@@ -9,24 +9,37 @@ import org.telegram.telegrambots.meta.api.objects.Update;
  * Handler for the /cancel_program command
  */
 @Component
-public class CancelProgramCommandHandler implements CommandHandler {
+public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
 
     public static final String COMMAND = "/cancel_program";
     private final ProgramCreationSessionManager sessionManager;
-    
+
     public CancelProgramCommandHandler(ProgramCreationSessionManager sessionManager) {
         this.sessionManager = sessionManager;
     }
-    
+
     @Override
     public boolean canHandle(String command) {
         return COMMAND.equals(command);
     }
-    
+
+    @Override
+    public boolean isAvailable(Long userId, ProgramCreationSessionManager sessionManager) {
+        return sessionManager.hasActiveSession(userId);
+    }
+
+    @Override
+    public SendMessage handleUnavailable(Update update) {
+        SendMessage response = new SendMessage();
+        response.setChatId(update.getMessage().getChatId().toString());
+        response.setText("You don't have an active program creation session to cancel.");
+        return response;
+    }
+
     @Override
     public SendMessage handle(Update update) {
         Long userId = update.getMessage().getFrom().getId();
-        
+
         // Check if user has an active session
         if (!sessionManager.hasActiveSession(userId)) {
             SendMessage response = new SendMessage();
@@ -34,10 +47,10 @@ public class CancelProgramCommandHandler implements CommandHandler {
             response.setText("You don't have an active program creation session to cancel.");
             return response;
         }
-        
+
         // End the session
         sessionManager.endSession(userId);
-        
+
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
         response.setText("✅ Program creation cancelled.");

@@ -18,22 +18,33 @@ import java.util.List;
  * Handler for the /show_program command
  */
 @Component
-public class ShowProgramCommandHandler implements CommandHandler {
+public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
     public static final String COMMAND = "/show_program";
 
     private final ProgramService programService;
-    private final ProgramCreationSessionManager sessionManager;
 
-    public ShowProgramCommandHandler(ProgramService programService,
-                                   ProgramCreationSessionManager sessionManager) {
+    public ShowProgramCommandHandler(ProgramService programService) {
         this.programService = programService;
-        this.sessionManager = sessionManager;
     }
 
     @Override
     public boolean canHandle(String command) {
         return COMMAND.equals(command);
+    }
+
+    @Override
+    public boolean isAvailable(Long userId, ProgramCreationSessionManager sessionManager) {
+        // Show program is available if user has an active program or active session
+        return programService.getActiveProgram(userId) != null || sessionManager.hasActiveSession(userId);
+    }
+
+    @Override
+    public SendMessage handleUnavailable(Update update) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(update.getMessage().getChatId().toString());
+        sendMessage.setText("You don't have an active program or program creation session. Start one with /create_program <name>");
+        return sendMessage;
     }
 
     @Transactional(readOnly = true)

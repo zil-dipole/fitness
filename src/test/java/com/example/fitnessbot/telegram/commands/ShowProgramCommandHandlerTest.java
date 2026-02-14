@@ -37,7 +37,7 @@ class ShowProgramCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new ShowProgramCommandHandler(programService, sessionManager);
+        handler = new ShowProgramCommandHandler(programService);
     }
 
     @Test
@@ -46,6 +46,38 @@ class ShowProgramCommandHandlerTest {
         assertFalse(handler.canHandle("/start"));
         assertFalse(handler.canHandle("/help"));
         assertFalse(handler.canHandle("/create_program"));
+    }
+
+    @Test
+    void testIsAvailableWithActiveProgram() {
+        when(programService.getActiveProgram(12345L)).thenReturn(new Program());
+        // We don't need to stub sessionManager.hasActiveSession here because the method should return true
+        // regardless of the session manager state when there's an active program
+        assertTrue(handler.isAvailable(12345L, sessionManager));
+    }
+
+    @Test
+    void testIsAvailableWithActiveSession() {
+        when(programService.getActiveProgram(12345L)).thenReturn(null);
+        when(sessionManager.hasActiveSession(12345L)).thenReturn(true);
+        assertTrue(handler.isAvailable(12345L, sessionManager));
+    }
+
+    @Test
+    void testIsAvailableWithoutActiveProgramOrSession() {
+        when(programService.getActiveProgram(12345L)).thenReturn(null);
+        when(sessionManager.hasActiveSession(12345L)).thenReturn(false);
+        assertFalse(handler.isAvailable(12345L, sessionManager));
+    }
+
+    @Test
+    void testHandleUnavailable() {
+        Update update = createMockUpdate();
+        SendMessage response = handler.handleUnavailable(update);
+        
+        assertNotNull(response);
+        assertEquals("6789", response.getChatId());
+        assertEquals("You don't have an active program or program creation session. Start one with /create_program <name>", response.getText());
     }
 
     @Test
@@ -63,7 +95,7 @@ class ShowProgramCommandHandlerTest {
         assertTrue(response.getText().contains("You don't have an active program"));
         assertNull(response.getParseMode()); // No markdown for plain text
         assertNull(response.getReplyMarkup()); // No keyboard for this case
-        
+
         // Verify interactions
         verify(programService).getActiveProgram(12345L);
         verifyNoMoreInteractions(programService);
@@ -73,7 +105,7 @@ class ShowProgramCommandHandlerTest {
     void testHandleWithActiveProgramButNoTrainingDays() {
         // Given
         Update update = createMockUpdate();
-        
+
         Program program = new Program();
         program.setId(1L);
         program.setName("My Workout Program");
@@ -94,7 +126,7 @@ class ShowProgramCommandHandlerTest {
         assertTrue(response.getText().contains("*Active Program: My Workout Program*"));
         assertTrue(response.getText().contains("No training days added yet."));
         assertNull(response.getReplyMarkup()); // No keyboard when no training days
-        
+
         // Verify interactions
         verify(programService).getActiveProgram(12345L);
         verifyNoMoreInteractions(programService);
@@ -104,32 +136,32 @@ class ShowProgramCommandHandlerTest {
     void testHandleWithActiveProgramAndTrainingDays() {
         // Given
         Update update = createMockUpdate();
-        
+
         Program program = new Program();
         program.setId(1L);
         program.setName("My Workout Program");
         User user = new User();
         user.setId(1L);
         program.setUser(user);
-        
+
         TrainingDay td1 = new TrainingDay();
         td1.setId(1L);
         td1.setTitle("Upper Body");
-        
+
         TrainingDay td2 = new TrainingDay();
         td2.setId(2L);
         td2.setTitle("Lower Body");
-        
+
         ProgramTrainingDay ptd1 = new ProgramTrainingDay();
         ptd1.setProgram(program);
         ptd1.setTrainingDay(td1);
         ptd1.setPosition(1);
-        
+
         ProgramTrainingDay ptd2 = new ProgramTrainingDay();
         ptd2.setProgram(program);
         ptd2.setTrainingDay(td2);
         ptd2.setPosition(2);
-        
+
         program.setProgramTrainingDays(Arrays.asList(ptd1, ptd2));
 
         when(programService.getActiveProgram(12345L)).thenReturn(program);
@@ -145,26 +177,26 @@ class ShowProgramCommandHandlerTest {
         assertTrue(response.getText().contains("Training Days:"));
         assertTrue(response.getText().contains("- Upper Body"));
         assertTrue(response.getText().contains("- Lower Body"));
-        
+
         // Verify inline keyboard
         assertNotNull(response.getReplyMarkup());
-        assertTrue(response.getReplyMarkup() instanceof InlineKeyboardMarkup);
-        
+        assertInstanceOf(InlineKeyboardMarkup.class, response.getReplyMarkup());
+
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
         List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
-        
+
         assertEquals(2, keyboard.size()); // Two rows for two training days
         assertEquals(1, keyboard.get(0).size()); // One button per row
         assertEquals(1, keyboard.get(1).size()); // One button per row
-        
-        InlineKeyboardButton button1 = keyboard.get(0).get(0);
+
+        InlineKeyboardButton button1 = keyboard.get(0).getFirst();
         assertEquals("Upper Body", button1.getText());
         assertEquals("show_day_1", button1.getCallbackData());
-        
-        InlineKeyboardButton button2 = keyboard.get(1).get(0);
+
+        InlineKeyboardButton button2 = keyboard.get(1).getFirst();
         assertEquals("Lower Body", button2.getText());
         assertEquals("show_day_2", button2.getCallbackData());
-        
+
         // Verify interactions
         verify(programService).getActiveProgram(12345L);
         verifyNoMoreInteractions(programService);

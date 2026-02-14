@@ -7,13 +7,12 @@ import com.example.fitnessbot.telegram.commands.CallbackQueryHandler;
 import com.example.fitnessbot.telegram.commands.CommandHandler;
 import com.example.fitnessbot.telegram.commands.CommandMetadata;
 import com.example.fitnessbot.telegram.commands.CommandRegistryService;
-import com.example.fitnessbot.telegram.commands.ShowDayCommandHandler;
+import com.example.fitnessbot.telegram.commands.ContextAwareCommandHandler;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
@@ -29,7 +28,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Collection;
 
 @Component
 @ConditionalOnProperty(name = "telegram.bot.token")
@@ -145,6 +143,15 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 case "view_programs":
                     message.setText("To view your programs, this feature will be implemented soon!");
                     break;
+                case "cancel_program":
+                    Long userId = callbackQuery.getFrom().getId();
+                    if (sessionManager.hasActiveSession(userId)) {
+                        sessionManager.endSession(userId);
+                        message.setText("✅ Program creation cancelled.");
+                    } else {
+                        message.setText("You don't have an active program creation session to cancel.");
+                    }
+                    break;
                 case "help":
                     message.setText("""
                             Simply forward your workout program messages to me and I'll parse and save them.
@@ -168,7 +175,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     break;
                 case "start_menu":
                     message.setText("Welcome to Fitness Bot! Choose an option below:");
-                    message.setReplyMarkup(createMainMenuKeyboard());
+                    message.setReplyMarkup(createMainMenuKeyboard(callbackQuery.getFrom().getId()));
                     break;
                 default:
                     // Handle command suggestions (new functionality)
@@ -249,8 +256,10 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     /**
      * Create the main menu inline keyboard
+     *
+     * @param userId The user ID to determine if they have an active session
      */
-    private InlineKeyboardMarkup createMainMenuKeyboard() {
+    private InlineKeyboardMarkup createMainMenuKeyboard(Long userId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
@@ -268,14 +277,24 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
         rows.add(firstRow);
 
-        // Second row - Help
-        List<InlineKeyboardButton> secondRow = new ArrayList<>();
+        // Check if user has an active session to show cancel button
+        if (sessionManager.hasActiveSession(userId)) {
+            List<InlineKeyboardButton> cancelRow = new ArrayList<>();
+            InlineKeyboardButton cancelProgramBtn = new InlineKeyboardButton();
+            cancelProgramBtn.setText("Cancel Program");
+            cancelProgramBtn.setCallbackData("cancel_program");
+            cancelRow.add(cancelProgramBtn);
+            rows.add(cancelRow);
+        }
+
+        // Last row - Help
+        List<InlineKeyboardButton> lastRow = new ArrayList<>();
         InlineKeyboardButton helpBtn = new InlineKeyboardButton();
         helpBtn.setText("Help");
         helpBtn.setCallbackData("help");
-        secondRow.add(helpBtn);
+        lastRow.add(helpBtn);
 
-        rows.add(secondRow);
+        rows.add(lastRow);
 
         markup.setKeyboard(rows);
         return markup;
@@ -382,7 +401,17 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             // Handle the command
             SendMessage response;
             if (handler != null) {
-                response = handler.handle(update);
+                // Check if it's a context-aware handler and if it's available
+                if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
+                    Long userId = update.getMessage().getFrom().getId();
+                    if (!contextAwareHandler.isAvailable(userId, sessionManager)) {
+                        response = contextAwareHandler.handleUnavailable(update);
+                    } else {
+                        response = handler.handle(update);
+                    }
+                } else {
+                    response = handler.handle(update);
+                }
             } else {
                 response = new SendMessage();
                 response.setChatId(update.getMessage().getChatId().toString());
@@ -429,12 +458,32 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
      * Show suggestions for partial command
      */
     private void showCommandSuggestions(Update update, String partialCommand) {
+        Long userId = update.getMessage().getFrom().getId();
         List<CommandMetadata> suggestions = commandRegistryService.findCommandsByPrefix(partialCommand);
 
         // If no prefix matches, try similarity search
         if (suggestions.isEmpty() && partialCommand.length() > 2) {
             suggestions = commandRegistryService.findSimilarCommands(partialCommand);
         }
+
+        // Filter suggestions to only include available commands for context-aware handlers
+        suggestions = suggestions.stream()
+                .filter(cmd -> {
+                    // Find the handler for this command
+                    CommandHandler handler = commandHandlers.stream()
+                            .filter(h -> h.canHandle(cmd.getCommand()))
+                            .findFirst()
+                            .orElse(null);
+                    
+                    // If it's a context-aware handler, check if it's available
+                    if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
+                        return contextAwareHandler.isAvailable(userId, sessionManager);
+                    }
+                    
+                    // Non-context-aware commands are always available
+                    return true;
+                })
+                .toList();
 
         if (!suggestions.isEmpty()) {
             SendMessage message = new SendMessage();

@@ -4,17 +4,15 @@ import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.telegram.commands.*;
 import com.example.fitnessbot.telegram.commands.CommandRegistryService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
 import java.util.List;
 
@@ -30,21 +28,22 @@ class FitnessTelegramBotUnitTest {
     @Mock
     private TrainingDayService trainingDayService;
 
-    @Spy
     private FitnessTelegramBot fitnessTelegramBot;
 
-    {
+    @BeforeEach
+    void setUp() {
         List<CommandHandler> commandHandlers = List.of(
             new StartCommandHandler(),
             new HelpCommandHandler(new CommandRegistryService()),
             new MenuCommandHandler()
         );
-        
+
         List<CallbackQueryHandler> callbackQueryHandlers = List.of(
             new ShowDayCommandHandler(trainingDayService)
         );
-        
-        fitnessTelegramBot = new FitnessTelegramBot(trainingDayService, new ProgramCreationSessionManager(), commandHandlers, callbackQueryHandlers, new CommandRegistryService(), "test-token", "test-username");
+
+        FitnessTelegramBot bot = new FitnessTelegramBot(trainingDayService, new ProgramCreationSessionManager(), commandHandlers, callbackQueryHandlers, new CommandRegistryService(), "test-token", "test-username");
+        fitnessTelegramBot = spy(bot);
     }
 
     @Test
@@ -133,12 +132,15 @@ class FitnessTelegramBotUnitTest {
     private Update createMockUpdateWithCommand(String command) {
         Update update = mock(Update.class);
         Message message = mock(Message.class);
+        org.telegram.telegrambots.meta.api.objects.User user = mock(org.telegram.telegrambots.meta.api.objects.User.class);
 
-        when(update.hasMessage()).thenReturn(true);
-        when(update.getMessage()).thenReturn(message);
-        when(message.hasText()).thenReturn(true);
-        when(message.getText()).thenReturn(command);
-        when(message.getChatId()).thenReturn(CHAT_ID);
+        lenient().when(update.hasMessage()).thenReturn(true);
+        lenient().when(update.getMessage()).thenReturn(message);
+        lenient().when(message.hasText()).thenReturn(true);
+        lenient().when(message.getText()).thenReturn(command);
+        lenient().when(message.getChatId()).thenReturn(CHAT_ID);
+        lenient().when(message.getFrom()).thenReturn(user);
+        lenient().when(user.getId()).thenReturn(USER_ID);
 
         return update;
     }
@@ -147,13 +149,17 @@ class FitnessTelegramBotUnitTest {
         Update update = mock(Update.class);
         CallbackQuery callbackQuery = mock(CallbackQuery.class);
         Message message = mock(Message.class);
+        org.telegram.telegrambots.meta.api.objects.User user = mock(org.telegram.telegrambots.meta.api.objects.User.class);
 
-        when(update.hasCallbackQuery()).thenReturn(true);
-        when(update.getCallbackQuery()).thenReturn(callbackQuery);
-        when(callbackQuery.getId()).thenReturn("test_callback_id");
-        when(callbackQuery.getData()).thenReturn(callbackData);
-        when(callbackQuery.getMessage()).thenReturn(message);
-        when(message.getChatId()).thenReturn(CHAT_ID);
+        lenient().when(update.hasCallbackQuery()).thenReturn(true);
+        lenient().when(update.getCallbackQuery()).thenReturn(callbackQuery);
+        lenient().when(callbackQuery.getId()).thenReturn("test_callback_id");
+        lenient().when(callbackQuery.getData()).thenReturn(callbackData);
+        lenient().when(callbackQuery.getMessage()).thenReturn(message);
+        lenient().when(callbackQuery.getFrom()).thenReturn(user);
+        lenient().when(message.getChatId()).thenReturn(CHAT_ID);
+        lenient().when(message.getFrom()).thenReturn(user);
+        lenient().when(user.getId()).thenReturn(USER_ID);
 
         return update;
     }
