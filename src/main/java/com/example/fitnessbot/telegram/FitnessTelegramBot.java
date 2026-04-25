@@ -565,7 +565,8 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 new BotCommand("help", "Show help"),
                 new BotCommand("menu", "Show main menu"),
                 new BotCommand("create_program", "Create a workout program"),
-                new BotCommand("show_program", "Show saved programs")
+                new BotCommand("show_program", "Show saved programs"),
+                new BotCommand("active_day", "Show active training day")
         );
     }
 

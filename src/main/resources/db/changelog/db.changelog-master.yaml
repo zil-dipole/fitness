@@ -11,3 +11,5 @@ databaseChangeLog:
       file: db/changelog/005-create-programs-table.yaml
   - include:
       file: db/changelog/006-create-program-training-days-table.yaml
+  - include:
+      file: db/changelog/007-add-active-program-fields.yaml

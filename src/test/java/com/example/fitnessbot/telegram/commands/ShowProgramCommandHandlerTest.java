@@ -173,6 +173,15 @@ class ShowProgramCommandHandlerTest {
         assertThat(response.getText()).contains("1. Upper Body");
         assertThat(response.getText()).contains("2. Lower Body");
         assertThat(response.getText()).contains("Total: 2 training days");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
+
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
+        assertThat(markup.getKeyboard()).hasSize(3);
+        assertThat(markup.getKeyboard().get(0)).extracting(InlineKeyboardButton::getCallbackData)
+                .containsExactly("start_program:1", "delete_program:1");
+        assertThat(markup.getKeyboard().get(1).get(0).getText()).isEqualTo("Day 1: Upper Body");
+        assertThat(markup.getKeyboard().get(1).get(0).getCallbackData()).isEqualTo("show_day_1");
+        assertThat(markup.getKeyboard().get(2).get(0).getCallbackData()).isEqualTo("show_day_2");
 
         verifyNoInteractions(sessionManager);
         verify(programService).getProgramForUser(1L, TEST_TELEGRAM_ID);
@@ -372,7 +381,7 @@ class ShowProgramCommandHandlerTest {
 
         Program program = new Program();
         program.setId(1L);
-        program.setName("My Workout Program");
+        program.setName("My <Workout> & Program");
         User user = new User();
         user.setId(1L);
         program.setUser(user);
@@ -389,8 +398,8 @@ class ShowProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getParseMode()).isEqualTo("Markdown");
-        assertThat(response.getText()).contains("*Program Creation Session: My Workout Program*");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("<b>Program Creation Session: My &lt;Workout&gt; &amp; Program</b>");
         assertThat(response.getText()).contains("No training days added yet.");
 
         // Verify interactions
@@ -412,7 +421,7 @@ class ShowProgramCommandHandlerTest {
 
         TrainingDay td1 = new TrainingDay();
         td1.setId(1L);
-        td1.setTitle("Upper Body");
+        td1.setTitle("Upper <Body> & Arms");
 
         TrainingDay td2 = new TrainingDay();
         td2.setId(2L);
@@ -430,10 +439,10 @@ class ShowProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getParseMode()).isEqualTo("Markdown");
-        assertThat(response.getText()).contains("*Program Creation Session: My Workout Program*");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("<b>Program Creation Session: My Workout Program</b>");
         assertThat(response.getText()).contains("Training Days Added:");
-        assertThat(response.getText()).contains("- Upper Body");
+        assertThat(response.getText()).contains("- Upper &lt;Body&gt; &amp; Arms");
         assertThat(response.getText()).contains("- Lower Body");
 
         // Verify interactions

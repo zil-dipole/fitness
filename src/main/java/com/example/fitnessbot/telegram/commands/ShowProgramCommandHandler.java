@@ -75,7 +75,9 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         var session = sessionManager.getSession(telegramUserId);
         if (session != null) {
             Program program = session.getProgram();
-            response.append("*Program Creation Session: ").append(program.getName()).append("*\n\n");
+            response.append("<b>Program Creation Session: ")
+                    .append(TrainingDayMessageFormatter.escapeHtml(program.getName()))
+                    .append("</b>\n\n");
             
             // Get training days from the session
             List<TrainingDay> trainingDays = session.getTrainingDays();
@@ -83,7 +85,9 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
                 response.append("Training Days Added:\n");
                 
                 for (TrainingDay trainingDay : trainingDays) {
-                    response.append("- ").append(trainingDay.getTitle()).append("\n");
+                    response.append("- ")
+                            .append(TrainingDayMessageFormatter.escapeHtml(trainingDay.getTitle()))
+                            .append("\n");
                 }
                 
                 response.append("\nTotal: ").append(trainingDays.size()).append(" training days");
@@ -92,8 +96,7 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
                 response.append("Forward training day messages to add them to this program.");
             }
             
-            // Set markdown for formatted response
-            sendMessage.setParseMode("Markdown");
+            sendMessage.setParseMode("HTML");
         } else {
             return buildSavedProgramList(sendMessage, telegramUserId);
         }
@@ -163,6 +166,7 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         }
 
         sendMessage.setText(response.toString());
+        sendMessage.setReplyMarkup(createProgramDetailsButtons(programId, trainingDays));
         return sendMessage;
     }
 
@@ -193,6 +197,33 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
             button.setText("#" + program.getId() + " " + program.getName());
             button.setCallbackData("show_program:" + program.getId());
             rows.add(List.of(button));
+        }
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    private InlineKeyboardMarkup createProgramDetailsButtons(
+            Long programId,
+            List<com.example.fitnessbot.model.ProgramTrainingDay> trainingDays) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        InlineKeyboardButton startButton = new InlineKeyboardButton();
+        startButton.setText("Start Program");
+        startButton.setCallbackData("start_program:" + programId);
+
+        InlineKeyboardButton deleteButton = new InlineKeyboardButton();
+        deleteButton.setText("Delete Program");
+        deleteButton.setCallbackData("delete_program:" + programId);
+        rows.add(List.of(startButton, deleteButton));
+
+        for (com.example.fitnessbot.model.ProgramTrainingDay programTrainingDay : trainingDays) {
+            TrainingDay trainingDay = programTrainingDay.getTrainingDay();
+            InlineKeyboardButton dayButton = new InlineKeyboardButton();
+            dayButton.setText("Day " + programTrainingDay.getPosition() + ": " + trainingDay.getTitle());
+            dayButton.setCallbackData("show_day_" + trainingDay.getId());
+            rows.add(List.of(dayButton));
         }
 
         markup.setKeyboard(rows);

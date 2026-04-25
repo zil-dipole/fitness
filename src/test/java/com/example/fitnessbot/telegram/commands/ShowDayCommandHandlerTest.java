@@ -62,8 +62,8 @@ class ShowDayCommandHandlerTest {
         // Create training day with exercises
         TrainingDay trainingDay = new TrainingDay();
         trainingDay.setId(1L);
-        trainingDay.setTitle("Upper Body");
-        trainingDay.setRawText("Upper Body\nUpper body workout focusing on chest and shoulders\n\n- Bench Press 3 x 10 (Warm up)\n- https://youtube.com/watch?v=example");
+        trainingDay.setTitle("Upper <Body> & Arms");
+        trainingDay.setRawText("Upper Body\nUpper body workout focusing on chest & shoulders\n\n- Bench Press 3 x 10 (Warm up)\n- https://youtube.com/watch?v=example&list=test");
 
         User user = new User();
         user.setId(1L);
@@ -73,12 +73,12 @@ class ShowDayCommandHandlerTest {
         // Create exercise with sets
         Exercise exercise = new Exercise();
         exercise.setId(1L);
-        exercise.setName("Bench Press");
+        exercise.setName("Bench & Press > Row");
         exercise.setSets(3);
         exercise.setRepsOrDuration("10");
         exercise.setLastWeightKg(60.0);
-        exercise.setNotes("(Warm up)");
-        exercise.setVideoUrls(Arrays.asList("https://youtube.com/watch?v=example"));
+        exercise.setNotes("(Warm up) keep shoulders < elbows");
+        exercise.setVideoUrls(Arrays.asList("https://youtube.com/watch?v=example&list=test"));
         exercise.setTrainingDay(trainingDay);
 
         trainingDay.setExercises(Collections.singletonList(exercise));
@@ -91,14 +91,14 @@ class ShowDayCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getParseMode()).isEqualTo("Markdown");
-        assertThat(response.getText()).contains("*Upper Body*");
-        assertThat(response.getText()).contains("Upper body workout focusing on chest and shoulders");
-        assertThat(response.getText()).contains("1. Bench Press");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("<b>Upper &lt;Body&gt; &amp; Arms</b>");
+        assertThat(response.getText()).contains("Upper body workout focusing on chest &amp; shoulders");
+        assertThat(response.getText()).contains("1. Bench &amp; Press &gt; Row");
         assertThat(response.getText()).contains("3 x 10");
         assertThat(response.getText()).contains("@ 60.0 kg");
-        assertThat(response.getText()).contains("Notes: (Warm up)");
-        assertThat(response.getText()).contains("https://youtube.com/watch?v=example");
+        assertThat(response.getText()).contains("Notes: (Warm up) keep shoulders &lt; elbows");
+        assertThat(response.getText()).contains("https://youtube.com/watch?v=example&amp;list=test");
 
         verify(trainingDayService).getTrainingDayById(1L);
         verifyNoMoreInteractions(trainingDayService);

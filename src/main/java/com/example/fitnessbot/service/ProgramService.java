@@ -8,12 +8,16 @@ import com.example.fitnessbot.repository.ProgramTrainingDayRepository;
 import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class ProgramService {
+
+    public record ActiveProgramSelection(Program program, TrainingDay trainingDay) {
+    }
 
     private final ProgramRepository programRepository;
     private final ProgramTrainingDayRepository programTrainingDayRepository;
@@ -121,6 +125,59 @@ public class ProgramService {
         return getProgramForUser(programId, telegramUserId)
                 .map(program -> programTrainingDayRepository.findByProgramIdOrderByPositionAsc(program.getId()))
                 .orElseGet(List::of);
+    }
+
+    @Transactional
+    public ActiveProgramSelection startProgramForUser(Long programId, Long telegramUserId) throws ProgramException {
+        User user = userRepository.findByTelegramId(telegramUserId)
+                .orElseThrow(() -> new ProgramException("Program not found."));
+
+        Program program = programRepository.findByIdAndUserId(programId, user.getId())
+                .orElseThrow(() -> new ProgramException("Program not found."));
+
+        List<ProgramTrainingDay> trainingDays = programTrainingDayRepository.findByProgramIdOrderByPositionAsc(programId);
+        if (trainingDays.isEmpty()) {
+            throw new ProgramException("Cannot start a program without training days.");
+        }
+
+        TrainingDay firstTrainingDay = trainingDays.getFirst().getTrainingDay();
+        user.setActiveProgram(program);
+        user.setActiveTrainingDay(firstTrainingDay);
+        userRepository.save(user);
+
+        return new ActiveProgramSelection(program, firstTrainingDay);
+    }
+
+    @Transactional
+    public boolean deleteProgramForUser(Long programId, Long telegramUserId) {
+        Optional<User> optionalUser = userRepository.findByTelegramId(telegramUserId);
+        if (optionalUser.isEmpty()) {
+            return false;
+        }
+
+        User user = optionalUser.get();
+        Optional<Program> optionalProgram = programRepository.findByIdAndUserId(programId, user.getId());
+        if (optionalProgram.isEmpty()) {
+            return false;
+        }
+
+        Program program = optionalProgram.get();
+        if (user.getActiveProgram() != null && programId.equals(user.getActiveProgram().getId())) {
+            user.setActiveProgram(null);
+            user.setActiveTrainingDay(null);
+            userRepository.save(user);
+        }
+
+        programTrainingDayRepository.deleteByProgramId(programId);
+        programRepository.delete(program);
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    public TrainingDay getActiveTrainingDayForUser(Long telegramUserId) {
+        return userRepository.findByTelegramId(telegramUserId)
+                .map(User::getActiveTrainingDay)
+                .orElse(null);
     }
 
     /**

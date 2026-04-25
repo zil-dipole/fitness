@@ -534,4 +534,133 @@ class ProgramServiceTest {
         assertThat(result).isEmpty();
         verifyNoInteractions(programTrainingDayRepository);
     }
+
+    @Test
+    void testStartProgramForUserSetsActiveProgramAndFirstTrainingDay() throws Exception {
+        Long programId = 1L;
+        Long telegramUserId = 123L;
+        Long userId = 1L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setTelegramId(telegramUserId);
+
+        Program program = new Program();
+        program.setId(programId);
+        program.setName("Strength");
+        program.setUser(user);
+
+        TrainingDay trainingDay = new TrainingDay();
+        trainingDay.setId(10L);
+        trainingDay.setTitle("Upper Body");
+
+        ProgramTrainingDay programTrainingDay = new ProgramTrainingDay();
+        programTrainingDay.setPosition(1);
+        programTrainingDay.setTrainingDay(trainingDay);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.of(program));
+        when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(programId)).thenReturn(List.of(programTrainingDay));
+
+        ProgramService.ActiveProgramSelection result = programService.startProgramForUser(programId, telegramUserId);
+
+        assertThat(result.program()).isEqualTo(program);
+        assertThat(result.trainingDay()).isEqualTo(trainingDay);
+        assertThat(user.getActiveProgram()).isEqualTo(program);
+        assertThat(user.getActiveTrainingDay()).isEqualTo(trainingDay);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void testStartProgramForUserWithoutTrainingDaysThrows() {
+        Long programId = 1L;
+        Long telegramUserId = 123L;
+        Long userId = 1L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setTelegramId(telegramUserId);
+
+        Program program = new Program();
+        program.setId(programId);
+        program.setUser(user);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.of(program));
+        when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(programId)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> programService.startProgramForUser(programId, telegramUserId))
+                .isInstanceOf(ProgramException.class)
+                .hasMessage("Cannot start a program without training days.");
+
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void testDeleteProgramForUserClearsActiveProgram() {
+        Long programId = 1L;
+        Long telegramUserId = 123L;
+        Long userId = 1L;
+
+        Program program = new Program();
+        program.setId(programId);
+
+        TrainingDay trainingDay = new TrainingDay();
+        trainingDay.setId(10L);
+
+        User user = new User();
+        user.setId(userId);
+        user.setTelegramId(telegramUserId);
+        user.setActiveProgram(program);
+        user.setActiveTrainingDay(trainingDay);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.of(program));
+
+        boolean deleted = programService.deleteProgramForUser(programId, telegramUserId);
+
+        assertThat(deleted).isTrue();
+        assertThat(user.getActiveProgram()).isNull();
+        assertThat(user.getActiveTrainingDay()).isNull();
+        verify(userRepository).save(user);
+        verify(programTrainingDayRepository).deleteByProgramId(programId);
+        verify(programRepository).delete(program);
+    }
+
+    @Test
+    void testDeleteProgramForUserNotFound() {
+        Long programId = 1L;
+        Long telegramUserId = 123L;
+        Long userId = 1L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setTelegramId(telegramUserId);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.empty());
+
+        boolean deleted = programService.deleteProgramForUser(programId, telegramUserId);
+
+        assertThat(deleted).isFalse();
+        verifyNoInteractions(programTrainingDayRepository);
+        verify(programRepository, never()).delete(any(Program.class));
+    }
+
+    @Test
+    void testGetActiveTrainingDayForUser() {
+        Long telegramUserId = 123L;
+        TrainingDay trainingDay = new TrainingDay();
+        trainingDay.setId(10L);
+
+        User user = new User();
+        user.setTelegramId(telegramUserId);
+        user.setActiveTrainingDay(trainingDay);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+
+        TrainingDay result = programService.getActiveTrainingDayForUser(telegramUserId);
+
+        assertThat(result).isEqualTo(trainingDay);
+    }
 }

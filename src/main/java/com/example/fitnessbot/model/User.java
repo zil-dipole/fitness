@@ -26,6 +26,14 @@ public class User {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "active_program_id")
+    private Program activeProgram;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "active_training_day_id")
+    private TrainingDay activeTrainingDay;
+
     public Long getId() {
         return id;
     }
@@ -88,5 +96,21 @@ public class User {
      */
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Program getActiveProgram() {
+        return activeProgram;
+    }
+
+    public void setActiveProgram(Program activeProgram) {
+        this.activeProgram = activeProgram;
+    }
+
+    public TrainingDay getActiveTrainingDay() {
+        return activeTrainingDay;
+    }
+
+    public void setActiveTrainingDay(TrainingDay activeTrainingDay) {
+        this.activeTrainingDay = activeTrainingDay;
     }
 }

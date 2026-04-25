@@ -64,6 +64,7 @@ class FitnessTelegramBotUnitTest {
         assertTrue(commands.contains("menu"));
         assertTrue(commands.contains("create_program"));
         assertTrue(commands.contains("show_program"));
+        assertTrue(commands.contains("active_day"));
         assertFalse(commands.contains("cancel_program"));
         assertFalse(commands.contains("finish_program"));
     }

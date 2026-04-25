@@ -50,6 +50,12 @@ public class CommandRegistryService {
         ));
 
         registerCommand(new CommandMetadata(
+            "/active_day",
+            "Show active training day",
+            "/active_day"
+        ));
+
+        registerCommand(new CommandMetadata(
             "/finish_program",
             "Finish and save the current program creation session",
             "/finish_program"
