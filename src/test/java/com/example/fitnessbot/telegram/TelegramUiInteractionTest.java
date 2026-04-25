@@ -53,7 +53,8 @@ class TelegramUiInteractionTest {
             new MenuCommandHandler(menuKeyboardFactory),
             new CreateProgramCommandHandler(programService, sessionManager, menuKeyboardFactory),
             new CancelProgramCommandHandler(sessionManager, menuKeyboardFactory),
-            new FinishProgramCommandHandler(programService, sessionManager, menuKeyboardFactory)
+            new FinishProgramCommandHandler(programService, sessionManager, menuKeyboardFactory),
+            new ShowProgramCommandHandler(programService, sessionManager)
         );
 
         List<CallbackQueryHandler> callbackQueryHandlers = List.of(
@@ -219,6 +220,54 @@ class TelegramUiInteractionTest {
         SendMessage sentMessage = captor6.getValue();
         assertNotNull(sentMessage);
         assertTrue(sentMessage.getText().contains("To create a program"));
+    }
+
+    @Test
+    void testViewProgramsCallbackQuery() throws Exception {
+        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
+        program.setId(1L);
+        program.setName("Strength");
+        when(programService.getProgramsForUser(USER_ID)).thenReturn(List.of(program));
+
+        Update update = createMockUpdateWithCallbackQuery("view_programs");
+        fitnessTelegramBot.onUpdateReceived(update);
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot).sendTelegramMessage(captor.capture());
+
+        SendMessage sentMessage = captor.getValue();
+        assertNotNull(sentMessage);
+        assertTrue(sentMessage.getText().contains("Your saved programs"));
+        assertTrue(sentMessage.getText().contains("#1 Strength"));
+        assertTrue(sentMessage.getReplyMarkup() instanceof InlineKeyboardMarkup);
+    }
+
+    @Test
+    void testSavedProgramButtonCallbackQuery() throws Exception {
+        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
+        program.setId(1L);
+        program.setName("Strength");
+
+        TrainingDay trainingDay = new TrainingDay();
+        trainingDay.setTitle("Upper Body");
+
+        com.example.fitnessbot.model.ProgramTrainingDay programTrainingDay = new com.example.fitnessbot.model.ProgramTrainingDay();
+        programTrainingDay.setPosition(1);
+        programTrainingDay.setTrainingDay(trainingDay);
+
+        when(programService.getProgramForUser(1L, USER_ID)).thenReturn(java.util.Optional.of(program));
+        when(programService.getProgramTrainingDaysForUser(1L, USER_ID)).thenReturn(List.of(programTrainingDay));
+
+        Update update = createMockUpdateWithCallbackQuery("show_program:1");
+        fitnessTelegramBot.onUpdateReceived(update);
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot).sendTelegramMessage(captor.capture());
+
+        SendMessage sentMessage = captor.getValue();
+        assertNotNull(sentMessage);
+        assertTrue(sentMessage.getText().contains("Program: Strength"));
+        assertTrue(sentMessage.getText().contains("1. Upper Body"));
     }
 
     @Test

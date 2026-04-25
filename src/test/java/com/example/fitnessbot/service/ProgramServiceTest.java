@@ -16,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -477,5 +476,62 @@ class ProgramServiceTest {
         
         verify(userRepository).findByTelegramId(telegramUserId);
         verifyNoMoreInteractions(programRepository);
+    }
+
+    @Test
+    void testGetProgramTrainingDaysForUser() {
+        // Given
+        Long programId = 1L;
+        Long telegramUserId = 123L;
+        Long userId = 1L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setTelegramId(telegramUserId);
+
+        Program program = new Program();
+        program.setId(programId);
+        program.setUser(user);
+
+        ProgramTrainingDay firstDay = new ProgramTrainingDay();
+        firstDay.setPosition(1);
+        ProgramTrainingDay secondDay = new ProgramTrainingDay();
+        secondDay.setPosition(2);
+        List<ProgramTrainingDay> trainingDays = List.of(firstDay, secondDay);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.of(program));
+        when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(programId)).thenReturn(trainingDays);
+
+        // When
+        List<ProgramTrainingDay> result = programService.getProgramTrainingDaysForUser(programId, telegramUserId);
+
+        // Then
+        assertThat(result).containsExactly(firstDay, secondDay);
+        verify(userRepository).findByTelegramId(telegramUserId);
+        verify(programRepository).findByIdAndUserId(programId, userId);
+        verify(programTrainingDayRepository).findByProgramIdOrderByPositionAsc(programId);
+    }
+
+    @Test
+    void testGetProgramTrainingDaysForUserProgramNotFound() {
+        // Given
+        Long programId = 1L;
+        Long telegramUserId = 123L;
+        Long userId = 1L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setTelegramId(telegramUserId);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.empty());
+
+        // When
+        List<ProgramTrainingDay> result = programService.getProgramTrainingDaysForUser(programId, telegramUserId);
+
+        // Then
+        assertThat(result).isEmpty();
+        verifyNoInteractions(programTrainingDayRepository);
     }
 }

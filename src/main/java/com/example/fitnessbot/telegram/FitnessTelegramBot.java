@@ -126,10 +126,9 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
                     break;
                 case "view_programs":
-                    message.setText("To view your programs, this feature will be implemented soon!");
-                    // Add menu keyboard to view programs message
-                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
-                    break;
+                    handleCommandCallback(callbackQuery, "/show_program");
+                    acknowledgeCallbackQuery(callbackQuery, null);
+                    return;
                 case "cancel_program":
                     Long userId = callbackQuery.getFrom().getId();
                     if (sessionManager.hasActiveSession(userId)) {
@@ -195,7 +194,11 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     break;
                 default:
                     // Handle command suggestions (new functionality)
-                    if (callbackData.startsWith("cmd:")) {
+                    if (callbackData.startsWith("show_program:")) {
+                        handleCommandCallback(callbackQuery, "/show_program " + callbackData.substring("show_program:".length()));
+                        acknowledgeCallbackQuery(callbackQuery, null);
+                        return;
+                    } else if (callbackData.startsWith("cmd:")) {
                         handleCommandSuggestion(callbackQuery);
                         return; // We've handled the callback, so we can return early
                     } else {
@@ -231,22 +234,27 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         String command = callbackData.substring(4); // Remove "cmd:" prefix
 
         acknowledgeCallbackQuery(callbackQuery, "Executing: " + command);
+        handleCommandCallback(callbackQuery, command);
+    }
 
-        // Create a fake update to simulate the command being sent
+    private void handleCommandCallback(CallbackQuery callbackQuery, String command) {
         Update fakeUpdate = new Update();
         org.telegram.telegrambots.meta.api.objects.Message fakeMessage = new org.telegram.telegrambots.meta.api.objects.Message();
         fakeMessage.setText(command);
 
-        // Cast to Message to access getChat() method
         if (callbackQuery.getMessage() instanceof org.telegram.telegrambots.meta.api.objects.Message originalMessage) {
             fakeMessage.setChat(originalMessage.getChat());
+            if (fakeMessage.getChat() == null) {
+                org.telegram.telegrambots.meta.api.objects.Chat chat = new org.telegram.telegrambots.meta.api.objects.Chat();
+                chat.setId(originalMessage.getChatId());
+                fakeMessage.setChat(chat);
+            }
         }
 
         fakeMessage.setFrom(callbackQuery.getFrom());
         fakeUpdate.setMessage(fakeMessage);
-        fakeUpdate.setUpdateId(1); // Set a dummy update ID
+        fakeUpdate.setUpdateId(1);
 
-        // Handle the command
         handleCommand(fakeUpdate);
     }
 

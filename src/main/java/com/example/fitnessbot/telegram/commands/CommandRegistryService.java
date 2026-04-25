@@ -45,8 +45,8 @@ public class CommandRegistryService {
 
         registerCommand(new CommandMetadata(
             "/show_program",
-            "Show details of the current program being created",
-            "/show_program"
+            "Show current or saved programs",
+            "/show_program <program_id or name>"
         ));
 
         registerCommand(new CommandMetadata(

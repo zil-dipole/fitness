@@ -9,7 +9,6 @@ import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -110,6 +109,18 @@ public class ProgramService {
     public Optional<Program> getProgramForUser(Long programId, Long telegramUserId) {
         return userRepository.findByTelegramId(telegramUserId)
                 .flatMap(user -> programRepository.findByIdAndUserId(programId, user.getId()));
+    }
+
+    /**
+     * Get ordered training days linked to a program if it belongs to the Telegram user.
+     * @param programId ID of the program
+     * @param telegramUserId Telegram user ID
+     * @return ordered program-training day links, or an empty list if the program is not owned by the user
+     */
+    public List<ProgramTrainingDay> getProgramTrainingDaysForUser(Long programId, Long telegramUserId) {
+        return getProgramForUser(programId, telegramUserId)
+                .map(program -> programTrainingDayRepository.findByProgramIdOrderByPositionAsc(program.getId()))
+                .orElseGet(List::of);
     }
 
     /**
