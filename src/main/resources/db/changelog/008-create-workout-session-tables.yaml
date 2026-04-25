@@ -1,0 +1,126 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-create-workout-session-tables
+      author: developer
+      changes:
+        - createTable:
+            tableName: workout_sessions
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_session_user
+                    references: users(id)
+              - column:
+                  name: training_day_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_session_training_day
+                    references: training_days(id)
+              - column:
+                  name: current_exercise_id
+                  type: bigint
+                  constraints:
+                    foreignKeyName: fk_workout_session_current_exercise
+                    references: exercises(id)
+              - column:
+                  name: current_set_number
+                  type: integer
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: IN_PROGRESS
+                  constraints:
+                    nullable: false
+              - column:
+                  name: started_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completed_at
+                  type: timestamp
+        - createTable:
+            tableName: workout_set_logs
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: workout_session_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_set_log_session
+                    references: workout_sessions(id)
+              - column:
+                  name: user_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_set_log_user
+                    references: users(id)
+              - column:
+                  name: training_day_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_set_log_training_day
+                    references: training_days(id)
+              - column:
+                  name: exercise_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_set_log_exercise
+                    references: exercises(id)
+              - column:
+                  name: set_number
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: weight_kg
+                  type: double
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: workout_sessions
+            indexName: idx_workout_sessions_user_status
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: workout_set_logs
+            indexName: idx_workout_set_logs_user_exercise
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: exercise_id
+              - column:
+                  name: created_at

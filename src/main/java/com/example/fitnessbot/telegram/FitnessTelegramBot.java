@@ -1,13 +1,16 @@
 package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.commands.CallbackQueryHandler;
 import com.example.fitnessbot.telegram.commands.CommandHandler;
 import com.example.fitnessbot.telegram.commands.CommandMetadata;
 import com.example.fitnessbot.telegram.commands.CommandRegistryService;
 import com.example.fitnessbot.telegram.commands.ContextAwareCommandHandler;
+import com.example.fitnessbot.telegram.commands.WorkoutMessageFormatter;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +42,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private static final int COMMANDS_PER_ROW = 2;
 
     private final TrainingDayService trainingDayService;
+    private final WorkoutService workoutService;
     private final ProgramCreationSessionManager sessionManager;
     private final List<CommandHandler> commandHandlers;
     private final List<CallbackQueryHandler> callbackQueryHandlers;
@@ -48,6 +52,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private final String botUsername;
 
     public FitnessTelegramBot(TrainingDayService trainingDayService,
+                              WorkoutService workoutService,
                               ProgramCreationSessionManager sessionManager,
                               List<CommandHandler> commandHandlers,
                               List<CallbackQueryHandler> callbackQueryHandlers,
@@ -57,6 +62,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                               @Value("${telegram.bot.username:}") String botUsername) {
         super(botToken);
         this.trainingDayService = trainingDayService;
+        this.workoutService = workoutService;
         this.sessionManager = sessionManager;
         this.commandHandlers = commandHandlers;
         this.callbackQueryHandlers = callbackQueryHandlers;
@@ -102,6 +108,10 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         // Handle callback queries (button presses)
         else if (update.hasCallbackQuery()) {
             handleCallbackQuery(update.getCallbackQuery());
+        }
+        // Handle plain workout input, such as weight entries for the current set
+        else if (update.hasMessage() && update.getMessage().hasText()) {
+            handlePlainTextMessage(update);
         }
     }
 
@@ -370,6 +380,46 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 sendTelegramMessage(sendMessage);
             } catch (Exception telegramApiException) {
                 log.error("Failed to send error message to user", telegramApiException);
+            }
+        }
+    }
+
+    private void handlePlainTextMessage(Update update) {
+        Long userId = update.getMessage().getFrom().getId();
+        if (!workoutService.hasActiveWorkoutSession(userId)) {
+            return;
+        }
+
+        SendMessage response = new SendMessage();
+        response.setChatId(update.getMessage().getChatId().toString());
+        try {
+            WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(
+                    userId,
+                    update.getMessage().getText()
+            );
+            if (result.dayCompleted() || !result.accepted()) {
+                response.setText(result.message());
+            } else {
+                response.setText(result.message() + "\n\n" + WorkoutMessageFormatter.formatExerciseView(result.exerciseView()));
+                response.setParseMode("HTML");
+                response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard());
+            }
+
+            sendTelegramMessage(response);
+        } catch (WorkoutException e) {
+            response.setText(e.getMessage());
+            try {
+                sendTelegramMessage(response);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send workout error message to user", telegramApiException);
+            }
+        } catch (Exception e) {
+            log.error("Failed to handle workout input for user {}", userId, e);
+            response.setText("Sorry, there was an error saving your workout weight.");
+            try {
+                sendTelegramMessage(response);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send workout error message to user", telegramApiException);
             }
         }
     }

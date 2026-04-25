@@ -3,6 +3,7 @@ package com.example.fitnessbot.service;
 import com.example.fitnessbot.model.Exercise;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.User;
+import com.example.fitnessbot.parser.OpenAiTrainingDayParser;
 import com.example.fitnessbot.parser.TrainingDayParser;
 import com.example.fitnessbot.repository.ExerciseRepository;
 import com.example.fitnessbot.repository.TrainingDayRepository;
@@ -21,13 +22,16 @@ import java.util.List;
 public class TrainingDayService {
 
     private final TrainingDayParser parser;
+    private final OpenAiTrainingDayParser openAiTrainingDayParser;
     private final UserRepository userRepository;
     private final TrainingDayRepository trainingDayRepository;
     private final ExerciseRepository exerciseRepository;
 
-    public TrainingDayService(TrainingDayParser parser, UserRepository userRepository,
+    public TrainingDayService(TrainingDayParser parser, OpenAiTrainingDayParser openAiTrainingDayParser,
+                              UserRepository userRepository,
                               TrainingDayRepository trainingDayRepository, ExerciseRepository exerciseRepository) {
         this.parser = parser;
+        this.openAiTrainingDayParser = openAiTrainingDayParser;
         this.userRepository = userRepository;
         this.trainingDayRepository = trainingDayRepository;
         this.exerciseRepository = exerciseRepository;
@@ -63,7 +67,9 @@ public class TrainingDayService {
                 });
 
         // 2. Parse the raw text into a structured model
-        TrainingDay parsedTrainingDay = parser.parse(rawText);
+        TrainingDay parsedTrainingDay = user.isUseAiParser()
+                ? openAiTrainingDayParser.parse(rawText)
+                : parser.parse(rawText);
 
         // 3. Set the user and raw text
         parsedTrainingDay.setUser(user);
@@ -71,7 +77,7 @@ public class TrainingDayService {
 
         // 4. Extract title from the first line
         String[] lines = rawText.split("\\r?\\n");
-        if (lines.length > 0) {
+        if ((parsedTrainingDay.getTitle() == null || parsedTrainingDay.getTitle().isBlank()) && lines.length > 0) {
             parsedTrainingDay.setTitle(lines[0].trim());
         }
 

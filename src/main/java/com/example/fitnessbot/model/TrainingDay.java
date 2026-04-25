@@ -29,6 +29,7 @@ public class TrainingDay {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "trainingDay", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
     private List<Exercise> exercises;
 
     @OneToMany(mappedBy = "trainingDay", cascade = CascadeType.ALL, orphanRemoval = true)

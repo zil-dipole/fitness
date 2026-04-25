@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-add-user-ai-parser-flag
+      author: codex
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: use_ai_parser
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false

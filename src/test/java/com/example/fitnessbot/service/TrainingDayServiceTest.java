@@ -3,6 +3,7 @@ package com.example.fitnessbot.service;
 import com.example.fitnessbot.model.Exercise;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.User;
+import com.example.fitnessbot.parser.OpenAiTrainingDayParser;
 import com.example.fitnessbot.parser.TrainingDayParser;
 import com.example.fitnessbot.repository.ExerciseRepository;
 import com.example.fitnessbot.repository.TrainingDayRepository;
@@ -28,6 +29,9 @@ class TrainingDayServiceTest {
     
     @Mock
     private TrainingDayParser parser;
+
+    @Mock
+    private OpenAiTrainingDayParser openAiTrainingDayParser;
     
     @Mock
     private UserRepository userRepository;
@@ -42,7 +46,7 @@ class TrainingDayServiceTest {
     
     @BeforeEach
     void setUp() {
-        trainingDayService = new TrainingDayService(parser, userRepository, trainingDayRepository, exerciseRepository);
+        trainingDayService = new TrainingDayService(parser, openAiTrainingDayParser, userRepository, trainingDayRepository, exerciseRepository);
     }
     
     @Test
@@ -53,6 +57,7 @@ class TrainingDayServiceTest {
         User user = new User();
         user.setId(1L);
         user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(false);
         
         TrainingDay parsedTrainingDay = new TrainingDay();
         parsedTrainingDay.setTitle("");
@@ -89,6 +94,7 @@ class TrainingDayServiceTest {
         verify(userRepository).findByTelegramId(TEST_TELEGRAM_ID);
         verify(parser).parse(rawText);
         verify(trainingDayRepository).save(any(TrainingDay.class));
+        verifyNoInteractions(openAiTrainingDayParser);
         verifyNoMoreInteractions(exerciseRepository);
     }
     
@@ -103,6 +109,7 @@ class TrainingDayServiceTest {
         User savedUser = new User();
         savedUser.setId(1L);
         savedUser.setTelegramId(TEST_TELEGRAM_ID);
+        savedUser.setUseAiParser(false);
         
         TrainingDay parsedTrainingDay = new TrainingDay();
         parsedTrainingDay.setTitle("");
@@ -135,6 +142,7 @@ class TrainingDayServiceTest {
         verify(userRepository).save(any(User.class));
         verify(parser).parse(rawText);
         verify(trainingDayRepository).save(any(TrainingDay.class));
+        verifyNoInteractions(openAiTrainingDayParser);
     }
     
     @Test
@@ -147,7 +155,7 @@ class TrainingDayServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Telegram user ID cannot be null");
         
-        verifyNoInteractions(parser, userRepository, trainingDayRepository, exerciseRepository);
+        verifyNoInteractions(parser, openAiTrainingDayParser, userRepository, trainingDayRepository, exerciseRepository);
     }
     
     @Test
@@ -157,7 +165,7 @@ class TrainingDayServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Raw text cannot be null or empty");
         
-        verifyNoInteractions(parser, userRepository, trainingDayRepository, exerciseRepository);
+        verifyNoInteractions(parser, openAiTrainingDayParser, userRepository, trainingDayRepository, exerciseRepository);
     }
     
     @Test
@@ -167,7 +175,7 @@ class TrainingDayServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Raw text cannot be null or empty");
         
-        verifyNoInteractions(parser, userRepository, trainingDayRepository, exerciseRepository);
+        verifyNoInteractions(parser, openAiTrainingDayParser, userRepository, trainingDayRepository, exerciseRepository);
     }
     
     @Test
@@ -177,7 +185,7 @@ class TrainingDayServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Raw text cannot be null or empty");
         
-        verifyNoInteractions(parser, userRepository, trainingDayRepository, exerciseRepository);
+        verifyNoInteractions(parser, openAiTrainingDayParser, userRepository, trainingDayRepository, exerciseRepository);
     }
     
     @Test
@@ -190,7 +198,7 @@ class TrainingDayServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Raw text is too large (max 10KB allowed)");
         
-        verifyNoInteractions(parser, userRepository, trainingDayRepository, exerciseRepository);
+        verifyNoInteractions(parser, openAiTrainingDayParser, userRepository, trainingDayRepository, exerciseRepository);
     }
     
     @Test
@@ -237,6 +245,7 @@ class TrainingDayServiceTest {
         User user = new User();
         user.setId(1L);
         user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(false);
         
         TrainingDay parsedTrainingDay = new TrainingDay();
         parsedTrainingDay.setTitle("");
@@ -263,6 +272,7 @@ class TrainingDayServiceTest {
         verify(userRepository).findByTelegramId(TEST_TELEGRAM_ID);
         verify(parser).parse(rawText);
         verify(trainingDayRepository).save(any(TrainingDay.class));
+        verifyNoInteractions(openAiTrainingDayParser);
     }
     
     @Test
@@ -273,6 +283,7 @@ class TrainingDayServiceTest {
         User user = new User();
         user.setId(1L);
         user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(false);
         
         TrainingDay parsedTrainingDay = new TrainingDay();
         parsedTrainingDay.setTitle("");
@@ -331,5 +342,49 @@ class TrainingDayServiceTest {
         
         verify(userRepository).findByTelegramId(TEST_TELEGRAM_ID);
         verify(parser).parse(rawText);
+        verifyNoInteractions(openAiTrainingDayParser);
+    }
+
+    @Test
+    void testProcessForwardedMessageUsesOpenAiParserForFlaggedUser() {
+        String rawText = "Workout A\n1. Squat 3 x 5 100 kg";
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(true);
+
+        TrainingDay parsedTrainingDay = new TrainingDay();
+        parsedTrainingDay.setTitle("Workout A");
+        Exercise exercise = new Exercise();
+        exercise.setPosition(0);
+        exercise.setSection("General");
+        exercise.setName("Squat");
+        exercise.setSets(3);
+        exercise.setRepsOrDuration("5");
+        exercise.setNotes("100 kg");
+        exercise.setLastWeightKg(100.0);
+        parsedTrainingDay.setExercises(List.of(exercise));
+
+        TrainingDay savedTrainingDay = new TrainingDay();
+        savedTrainingDay.setId(1L);
+        savedTrainingDay.setUser(user);
+        savedTrainingDay.setRawText(rawText);
+        savedTrainingDay.setTitle("Workout A");
+        exercise.setTrainingDay(savedTrainingDay);
+        savedTrainingDay.setExercises(List.of(exercise));
+
+        when(userRepository.findByTelegramId(TEST_TELEGRAM_ID)).thenReturn(Optional.of(user));
+        when(openAiTrainingDayParser.parse(rawText)).thenReturn(parsedTrainingDay);
+        when(trainingDayRepository.save(any(TrainingDay.class))).thenReturn(savedTrainingDay);
+
+        TrainingDay result = trainingDayService.processForwardedMessage(TEST_TELEGRAM_ID, rawText);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getTitle()).isEqualTo("Workout A");
+        verify(userRepository).findByTelegramId(TEST_TELEGRAM_ID);
+        verify(openAiTrainingDayParser).parse(rawText);
+        verify(trainingDayRepository).save(any(TrainingDay.class));
+        verifyNoInteractions(parser);
     }
 }

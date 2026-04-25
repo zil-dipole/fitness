@@ -3,7 +3,7 @@ package com.example.fitnessbot.exception;
 /**
  * Exception for training day-related operations
  */
-public class TrainingDayException extends FitnessBotException {
+public class TrainingDayException extends RuntimeException {
     
     public TrainingDayException(String message) {
         super(message);

@@ -26,6 +26,9 @@ public class User {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "use_ai_parser", nullable = false)
+    private boolean useAiParser = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "active_program_id")
     private Program activeProgram;
@@ -96,6 +99,14 @@ public class User {
      */
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public boolean isUseAiParser() {
+        return useAiParser;
+    }
+
+    public void setUseAiParser(boolean useAiParser) {
+        this.useAiParser = useAiParser;
     }
 
     public Program getActiveProgram() {

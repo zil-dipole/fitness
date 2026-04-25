@@ -37,3 +37,8 @@ server:
 telegram:
   bot:
     token: ""
+
+openai:
+  api-key: test-key
+  base-url: http://localhost
+  model: gpt-4o-mini

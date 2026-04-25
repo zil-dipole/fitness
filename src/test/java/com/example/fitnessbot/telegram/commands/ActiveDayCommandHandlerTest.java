@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
 import java.util.List;
 
@@ -69,6 +70,7 @@ class ActiveDayCommandHandlerTest {
         assertThat(response.getText()).contains("<b>Upper &lt;Body&gt; &amp; Arms</b>");
         assertThat(response.getText()).contains("Bench &amp; Row &gt; Press");
         assertThat(response.getText()).contains("Keep elbows &lt; shoulders &amp; controlled");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
     private Update createUpdate() {

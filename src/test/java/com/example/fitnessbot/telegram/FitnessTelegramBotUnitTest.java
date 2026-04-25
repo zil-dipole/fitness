@@ -2,6 +2,7 @@ package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import com.example.fitnessbot.telegram.commands.*;
 import com.example.fitnessbot.telegram.commands.CommandRegistryService;
@@ -15,7 +16,9 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,6 +32,9 @@ class FitnessTelegramBotUnitTest {
 
     @Mock
     private TrainingDayService trainingDayService;
+
+    @Mock
+    private WorkoutService workoutService;
 
     private FitnessTelegramBot fitnessTelegramBot;
 
@@ -44,7 +50,7 @@ class FitnessTelegramBotUnitTest {
             new ShowDayCommandHandler(trainingDayService)
         );
 
-        FitnessTelegramBot bot = new FitnessTelegramBot(trainingDayService, new ProgramCreationSessionManager(), commandHandlers, callbackQueryHandlers, new CommandRegistryService(), mock(MenuKeyboardFactory.class), "test-token", "test-username");
+        FitnessTelegramBot bot = new FitnessTelegramBot(trainingDayService, workoutService, new ProgramCreationSessionManager(), commandHandlers, callbackQueryHandlers, new CommandRegistryService(), mock(MenuKeyboardFactory.class), "test-token", "test-username");
         fitnessTelegramBot = spy(bot);
     }
 
@@ -145,6 +151,41 @@ class FitnessTelegramBotUnitTest {
 
         // Verify that a message was sent (account for both the response and error message)
         verify(fitnessTelegramBot, atLeastOnce()).sendTelegramMessage(any(SendMessage.class));
+    }
+
+    @Test
+    void testHandleWorkoutWeightInput() throws Exception {
+        Update update = createMockUpdateWithCommand("60");
+        WorkoutService.WorkoutExerciseView view = new WorkoutService.WorkoutExerciseView(
+                100L,
+                "Upper Body",
+                "Bench Press",
+                1,
+                2,
+                2,
+                3,
+                "8",
+                "Warm up first",
+                List.of("https://video.example/bench"),
+                List.of(new WorkoutService.WorkoutHistoryEntry(
+                        LocalDateTime.of(2026, 4, 25, 12, 0),
+                        List.of(55.0, 57.5, 60.0)
+                ))
+        );
+
+        when(workoutService.hasActiveWorkoutSession(USER_ID)).thenReturn(true);
+        when(workoutService.recordWeightForCurrentSet(USER_ID, "60"))
+                .thenReturn(new WorkoutService.WeightEntryResult(true, false, "Saved set 1: 60 kg.", view));
+        doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
+
+        fitnessTelegramBot.onUpdateReceived(update);
+
+        verify(fitnessTelegramBot).sendTelegramMessage(argThat(message ->
+                "HTML".equals(message.getParseMode())
+                        && message.getText().contains("Saved set 1: 60 kg.")
+                        && message.getText().contains("Exercise 1/2")
+                        && message.getReplyMarkup() instanceof InlineKeyboardMarkup
+        ));
     }
 
     private Update createMockUpdateWithCommand(String command) {

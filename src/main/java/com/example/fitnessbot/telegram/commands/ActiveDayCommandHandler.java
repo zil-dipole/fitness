@@ -38,6 +38,7 @@ public class ActiveDayCommandHandler implements CommandHandler {
 
         response.setText("Active training day:\n\n" + TrainingDayMessageFormatter.format(activeTrainingDay));
         response.setParseMode("HTML");
+        response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard());
         return response;
     }
 

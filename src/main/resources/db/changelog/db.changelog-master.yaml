@@ -13,3 +13,7 @@ databaseChangeLog:
       file: db/changelog/006-create-program-training-days-table.yaml
   - include:
       file: db/changelog/007-add-active-program-fields.yaml
+  - include:
+      file: db/changelog/008-create-workout-session-tables.yaml
+  - include:
+      file: db/changelog/010-add-user-ai-parser-flag.yaml

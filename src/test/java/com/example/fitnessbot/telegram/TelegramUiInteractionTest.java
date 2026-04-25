@@ -6,6 +6,7 @@ import com.example.fitnessbot.model.User;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import com.example.fitnessbot.telegram.commands.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,9 @@ class TelegramUiInteractionTest {
     @Mock
     private ProgramService programService;
 
+    @Mock
+    private WorkoutService workoutService;
+
     private FitnessTelegramBot fitnessTelegramBot;
     private ProgramCreationSessionManager sessionManager;
 
@@ -63,6 +67,7 @@ class TelegramUiInteractionTest {
 
         FitnessTelegramBot bot = new FitnessTelegramBot(
             trainingDayService,
+            workoutService,
             sessionManager,
             commandHandlers,
             callbackQueryHandlers,
