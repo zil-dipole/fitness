@@ -18,11 +18,15 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.ArrayList;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ShowDayCommandHandlerTest {
+    
+    private static final Long TEST_TELEGRAM_ID = 12345L;
+    private static final Long TEST_CHAT_ID = 6789L;
+    private static final Long UNAUTHORIZED_TELEGRAM_ID = 99999L;
 
     @Mock
     private TrainingDayService trainingDayService;
@@ -39,7 +43,7 @@ class ShowDayCommandHandlerTest {
         CallbackQuery callbackQuery = mock(CallbackQuery.class);
         when(callbackQuery.getData()).thenReturn("show_day_123");
 
-        assertTrue(handler.canHandle(callbackQuery));
+        assertThat(handler.canHandle(callbackQuery)).isTrue();
     }
 
     @Test
@@ -47,25 +51,25 @@ class ShowDayCommandHandlerTest {
         CallbackQuery callbackQuery = mock(CallbackQuery.class);
         when(callbackQuery.getData()).thenReturn("invalid_data");
 
-        assertFalse(handler.canHandle(callbackQuery));
+        assertThat(handler.canHandle(callbackQuery)).isFalse();
     }
 
     @Test
     void testHandleWithValidTrainingDay() {
         // Given
         Update update = createMockUpdate("show_day_1");
-        
+
         // Create training day with exercises
         TrainingDay trainingDay = new TrainingDay();
         trainingDay.setId(1L);
         trainingDay.setTitle("Upper Body");
         trainingDay.setRawText("Upper Body\nUpper body workout focusing on chest and shoulders\n\n- Bench Press 3 x 10 (Warm up)\n- https://youtube.com/watch?v=example");
-        
+
         User user = new User();
         user.setId(1L);
-        user.setTelegramId(12345L);
+        user.setTelegramId(TEST_TELEGRAM_ID);
         trainingDay.setUser(user);
-        
+
         // Create exercise with sets
         Exercise exercise = new Exercise();
         exercise.setId(1L);
@@ -76,27 +80,28 @@ class ShowDayCommandHandlerTest {
         exercise.setNotes("(Warm up)");
         exercise.setVideoUrls(Arrays.asList("https://youtube.com/watch?v=example"));
         exercise.setTrainingDay(trainingDay);
-        
+
         trainingDay.setExercises(Collections.singletonList(exercise));
-        
+
         when(trainingDayService.getTrainingDayById(1L)).thenReturn(trainingDay);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertEquals("Markdown", response.getParseMode());
-        assertTrue(response.getText().contains("*Upper Body*"));
-        assertTrue(response.getText().contains("Upper body workout focusing on chest and shoulders"));
-        assertTrue(response.getText().contains("1. Bench Press"));
-        assertTrue(response.getText().contains("3 x 10"));
-        assertTrue(response.getText().contains("@ 60.0 kg"));
-        assertTrue(response.getText().contains("Notes: (Warm up)"));
-        assertTrue(response.getText().contains("https://youtube.com/watch?v=example"));
-        
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getParseMode()).isEqualTo("Markdown");
+        assertThat(response.getText()).contains("*Upper Body*");
+        assertThat(response.getText()).contains("Upper body workout focusing on chest and shoulders");
+        assertThat(response.getText()).contains("1. Bench Press");
+        assertThat(response.getText()).contains("3 x 10");
+        assertThat(response.getText()).contains("@ 60.0 kg");
+        assertThat(response.getText()).contains("Notes: (Warm up)");
+        assertThat(response.getText()).contains("https://youtube.com/watch?v=example");
+
         verify(trainingDayService).getTrainingDayById(1L);
+        verifyNoMoreInteractions(trainingDayService);
     }
 
     @Test
@@ -109,10 +114,12 @@ class ShowDayCommandHandlerTest {
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertEquals("Training day not found.", response.getText());
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).isEqualTo("Training day not found.");
+        
         verify(trainingDayService).getTrainingDayById(999L);
+        verifyNoMoreInteractions(trainingDayService);
     }
 
     @Test
@@ -124,35 +131,37 @@ class ShowDayCommandHandlerTest {
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertEquals("Invalid training day ID.", response.getText());
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).isEqualTo("Invalid training day ID.");
     }
 
     @Test
     void testHandleWithUnauthorizedAccess() {
         // Given
         Update update = createMockUpdate("show_day_1");
-        
+
         TrainingDay trainingDay = new TrainingDay();
         trainingDay.setId(1L);
         trainingDay.setTitle("Upper Body");
-        
+
         User user = new User();
         user.setId(1L);
-        user.setTelegramId(99999L); // Different user ID
+        user.setTelegramId(UNAUTHORIZED_TELEGRAM_ID); // Different user ID
         trainingDay.setUser(user);
-        
+
         when(trainingDayService.getTrainingDayById(1L)).thenReturn(trainingDay);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertEquals("You don't have permission to view this training day.", response.getText());
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).isEqualTo("You don't have permission to view this training day.");
+        
         verify(trainingDayService).getTrainingDayById(1L);
+        verifyNoMoreInteractions(trainingDayService);
     }
 
     private Update createMockUpdate(String callbackData) {
@@ -164,9 +173,9 @@ class ShowDayCommandHandlerTest {
         when(update.getCallbackQuery()).thenReturn(callbackQuery);
         when(callbackQuery.getData()).thenReturn(callbackData);
         when(callbackQuery.getMessage()).thenReturn(message);
-        when(message.getChatId()).thenReturn(6789L);
+        when(message.getChatId()).thenReturn(TEST_CHAT_ID);
         when(callbackQuery.getFrom()).thenReturn(user);
-        when(user.getId()).thenReturn(12345L);
+        when(user.getId()).thenReturn(TEST_TELEGRAM_ID);
 
         return update;
     }

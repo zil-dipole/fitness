@@ -145,7 +145,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <argLine>-Dspring.classformat.ignore=true -Dnet.bytebuddy.experimental=true</argLine>
+                    <argLine>-Dspring.classformat.ignore=true -Dnet.bytebuddy.experimental=true -Dtest.profile=true</argLine>
                 </configuration>
             </plugin>
         </plugins>

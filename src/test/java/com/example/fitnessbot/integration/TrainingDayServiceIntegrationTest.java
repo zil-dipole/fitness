@@ -17,6 +17,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.Random;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = FitnessBotApplication.class)
@@ -31,9 +33,12 @@ class TrainingDayServiceIntegrationTest extends AbstractWithDbTest {
 
     @Test
     void testProcessForwardedMessage() {
+        // Generate a random Telegram ID to avoid conflicts between test runs
+        long randomTelegramId = new Random().nextLong();
+        
         // Create a test user for this specific test
         User testUser = new User();
-        testUser.setTelegramId(123456789L);
+        testUser.setTelegramId(randomTelegramId);
         testUser.setName("Test User");
         testUser.setWeightKg(75.5);
         testUser = userRepository.save(testUser);
@@ -89,9 +94,12 @@ class TrainingDayServiceIntegrationTest extends AbstractWithDbTest {
 
     @Test
     void testDatabaseConnection() {
+        // Generate a random Telegram ID to avoid conflicts between test runs
+        long randomTelegramId = new Random().nextLong();
+        
         // Verify that we can save and retrieve a user
         User user = new User();
-        user.setTelegramId(987654321L); // Different Telegram ID to avoid constraint violation
+        user.setTelegramId(randomTelegramId);
         user.setName("Database Test User");
         user.setWeightKg(80.0);
 
@@ -101,7 +109,7 @@ class TrainingDayServiceIntegrationTest extends AbstractWithDbTest {
         User retrievedUser = userRepository.findById(savedUser.getId()).orElse(null);
         assertThat(retrievedUser).isNotNull();
         assertThat(retrievedUser.getName()).isEqualTo("Database Test User");
-        assertThat(retrievedUser.getTelegramId()).isEqualTo(987654321L);
+        assertThat(retrievedUser.getTelegramId()).isEqualTo(randomTelegramId);
         assertThat(retrievedUser.getWeightKg()).isEqualTo(80.0);
     }
 }

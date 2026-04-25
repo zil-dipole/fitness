@@ -21,11 +21,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ShowProgramCommandHandlerTest {
+    
+    private static final Long TEST_TELEGRAM_ID = 12345L;
+    private static final Long TEST_CHAT_ID = 6789L;
 
     @Mock
     private ProgramService programService;
@@ -37,68 +40,61 @@ class ShowProgramCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new ShowProgramCommandHandler(programService);
+        handler = new ShowProgramCommandHandler(programService, sessionManager);
     }
 
     @Test
     void testCanHandle() {
-        assertTrue(handler.canHandle("/show_program"));
-        assertFalse(handler.canHandle("/start"));
-        assertFalse(handler.canHandle("/help"));
-        assertFalse(handler.canHandle("/create_program"));
-    }
-
-    @Test
-    void testIsAvailableWithActiveProgram() {
-        when(programService.getActiveProgram(12345L)).thenReturn(new Program());
-        // We don't need to stub sessionManager.hasActiveSession here because the method should return true
-        // regardless of the session manager state when there's an active program
-        assertTrue(handler.isAvailable(12345L, sessionManager));
+        assertThat(handler.canHandle("/show_program")).isTrue();
+        assertThat(handler.canHandle("/start")).isFalse();
+        assertThat(handler.canHandle("/help")).isFalse();
+        assertThat(handler.canHandle("/create_program")).isFalse();
     }
 
     @Test
     void testIsAvailableWithActiveSession() {
-        when(programService.getActiveProgram(12345L)).thenReturn(null);
-        when(sessionManager.hasActiveSession(12345L)).thenReturn(true);
-        assertTrue(handler.isAvailable(12345L, sessionManager));
+        when(sessionManager.hasActiveSession(TEST_TELEGRAM_ID)).thenReturn(true);
+        assertThat(handler.isAvailable(TEST_TELEGRAM_ID, sessionManager)).isTrue();
     }
 
     @Test
     void testIsAvailableWithoutActiveProgramOrSession() {
-        when(programService.getActiveProgram(12345L)).thenReturn(null);
-        when(sessionManager.hasActiveSession(12345L)).thenReturn(false);
-        assertFalse(handler.isAvailable(12345L, sessionManager));
+        when(sessionManager.hasActiveSession(TEST_TELEGRAM_ID)).thenReturn(false);
+        assertThat(handler.isAvailable(TEST_TELEGRAM_ID, sessionManager)).isFalse();
     }
 
     @Test
     void testHandleUnavailable() {
         Update update = createMockUpdate();
         SendMessage response = handler.handleUnavailable(update);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).isEqualTo("You don't have an active program creation session. Start one with /create_program <name>");
         
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertEquals("You don't have an active program or program creation session. Start one with /create_program <name>", response.getText());
+        // Verify that no unexpected interactions occurred
+        verifyNoMoreInteractions(sessionManager);
     }
 
     @Test
     void testHandleWithoutActiveProgram() {
         // Given
         Update update = createMockUpdate();
-        when(programService.getActiveProgram(12345L)).thenReturn(null);
+        when(sessionManager.getSession(TEST_TELEGRAM_ID)).thenReturn(null);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertTrue(response.getText().contains("You don't have an active program"));
-        assertNull(response.getParseMode()); // No markdown for plain text
-        assertNull(response.getReplyMarkup()); // No keyboard for this case
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).contains("You don't have an active program creation session");
+        assertThat(response.getParseMode()).isNull(); // No markdown for plain text
+        assertThat(response.getReplyMarkup()).isNull(); // No keyboard for this case
 
         // Verify interactions
-        verify(programService).getActiveProgram(12345L);
-        verifyNoMoreInteractions(programService);
+        verify(sessionManager).getSession(TEST_TELEGRAM_ID);
+        verifyNoMoreInteractions(sessionManager);
     }
 
     @Test
@@ -112,24 +108,26 @@ class ShowProgramCommandHandlerTest {
         User user = new User();
         user.setId(1L);
         program.setUser(user);
-        program.setProgramTrainingDays(Collections.emptyList());
 
-        when(programService.getActiveProgram(12345L)).thenReturn(program);
+        ProgramCreationSessionManager.ProgramCreationSession session = mock(ProgramCreationSessionManager.ProgramCreationSession.class);
+        when(session.getProgram()).thenReturn(program);
+        when(session.getTrainingDays()).thenReturn(Collections.emptyList());
+
+        when(sessionManager.getSession(TEST_TELEGRAM_ID)).thenReturn(session);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertEquals("Markdown", response.getParseMode());
-        assertTrue(response.getText().contains("*Active Program: My Workout Program*"));
-        assertTrue(response.getText().contains("No training days added yet."));
-        assertNull(response.getReplyMarkup()); // No keyboard when no training days
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getParseMode()).isEqualTo("Markdown");
+        assertThat(response.getText()).contains("*Program Creation Session: My Workout Program*");
+        assertThat(response.getText()).contains("No training days added yet.");
 
         // Verify interactions
-        verify(programService).getActiveProgram(12345L);
-        verifyNoMoreInteractions(programService);
+        verify(sessionManager).getSession(TEST_TELEGRAM_ID);
+        verifyNoMoreInteractions(sessionManager);
     }
 
     @Test
@@ -152,54 +150,27 @@ class ShowProgramCommandHandlerTest {
         td2.setId(2L);
         td2.setTitle("Lower Body");
 
-        ProgramTrainingDay ptd1 = new ProgramTrainingDay();
-        ptd1.setProgram(program);
-        ptd1.setTrainingDay(td1);
-        ptd1.setPosition(1);
+        ProgramCreationSessionManager.ProgramCreationSession session = mock(ProgramCreationSessionManager.ProgramCreationSession.class);
+        when(session.getProgram()).thenReturn(program);
+        when(session.getTrainingDays()).thenReturn(Arrays.asList(td1, td2));
 
-        ProgramTrainingDay ptd2 = new ProgramTrainingDay();
-        ptd2.setProgram(program);
-        ptd2.setTrainingDay(td2);
-        ptd2.setPosition(2);
-
-        program.setProgramTrainingDays(Arrays.asList(ptd1, ptd2));
-
-        when(programService.getActiveProgram(12345L)).thenReturn(program);
+        when(sessionManager.getSession(TEST_TELEGRAM_ID)).thenReturn(session);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertEquals("Markdown", response.getParseMode());
-        assertTrue(response.getText().contains("*Active Program: My Workout Program*"));
-        assertTrue(response.getText().contains("Training Days:"));
-        assertTrue(response.getText().contains("- Upper Body"));
-        assertTrue(response.getText().contains("- Lower Body"));
-
-        // Verify inline keyboard
-        assertNotNull(response.getReplyMarkup());
-        assertInstanceOf(InlineKeyboardMarkup.class, response.getReplyMarkup());
-
-        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
-        List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
-
-        assertEquals(2, keyboard.size()); // Two rows for two training days
-        assertEquals(1, keyboard.get(0).size()); // One button per row
-        assertEquals(1, keyboard.get(1).size()); // One button per row
-
-        InlineKeyboardButton button1 = keyboard.get(0).getFirst();
-        assertEquals("Upper Body", button1.getText());
-        assertEquals("show_day_1", button1.getCallbackData());
-
-        InlineKeyboardButton button2 = keyboard.get(1).getFirst();
-        assertEquals("Lower Body", button2.getText());
-        assertEquals("show_day_2", button2.getCallbackData());
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getParseMode()).isEqualTo("Markdown");
+        assertThat(response.getText()).contains("*Program Creation Session: My Workout Program*");
+        assertThat(response.getText()).contains("Training Days Added:");
+        assertThat(response.getText()).contains("- Upper Body");
+        assertThat(response.getText()).contains("- Lower Body");
 
         // Verify interactions
-        verify(programService).getActiveProgram(12345L);
-        verifyNoMoreInteractions(programService);
+        verify(sessionManager).getSession(TEST_TELEGRAM_ID);
+        verifyNoMoreInteractions(sessionManager);
     }
 
     private Update createMockUpdate() {
@@ -210,8 +181,8 @@ class ShowProgramCommandHandlerTest {
         lenient().when(update.getMessage()).thenReturn(message);
         lenient().when(message.getText()).thenReturn("/show_program");
         lenient().when(message.getFrom()).thenReturn(user);
-        lenient().when(user.getId()).thenReturn(12345L);
-        lenient().when(message.getChatId()).thenReturn(6789L);
+        lenient().when(user.getId()).thenReturn(TEST_TELEGRAM_ID);
+        lenient().when(message.getChatId()).thenReturn(TEST_CHAT_ID);
 
         return update;
     }

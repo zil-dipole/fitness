@@ -4,6 +4,7 @@ import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.User;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,11 +15,14 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CreateProgramCommandHandlerTest {
+    
+    private static final Long TEST_USER_ID = 12345L;
+    private static final Long TEST_CHAT_ID = 6789L;
 
     @Mock
     private ProgramService programService;
@@ -30,107 +34,113 @@ class CreateProgramCommandHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new CreateProgramCommandHandler(programService, sessionManager);
+        handler = new CreateProgramCommandHandler(programService, sessionManager, mock(MenuKeyboardFactory.class));
     }
 
     @Test
     void testCanHandle() {
-        assertTrue(handler.canHandle("/create_program"));
-        assertTrue(handler.canHandle("/create_program My Program"));
-        assertFalse(handler.canHandle("/start"));
-        assertFalse(handler.canHandle("/help"));
+        assertThat(handler.canHandle("/create_program")).isTrue();
+        assertThat(handler.canHandle("/create_program My Program")).isTrue();
+        assertThat(handler.canHandle("/start")).isFalse();
+        assertThat(handler.canHandle("/help")).isFalse();
     }
 
     @Test
-    void testHandleWithActiveSession() {
+    void testHandleWithActiveSession() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program My Program");
-        when(sessionManager.hasActiveSession(12345L)).thenReturn(true);
+        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(true);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertTrue(response.getText().contains("You already have an active program creation session"));
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).contains("You already have an active program creation session");
+        
+        verify(sessionManager).hasActiveSession(TEST_USER_ID);
+        verifyNoMoreInteractions(programService, sessionManager);
     }
 
     @Test
-    void testHandleSuccessWithName() {
+    void testHandleSuccessWithName() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program My Awesome Program");
-        when(sessionManager.hasActiveSession(12345L)).thenReturn(false);
-        
+        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(false);
+
         Program program = new Program();
         program.setId(1L);
         program.setName("My Awesome Program");
         User user = new User();
         user.setId(1L);
         program.setUser(user);
-        
-        when(programService.startProgramCreation(12345L, "My Awesome Program")).thenReturn(program);
-        doNothing().when(sessionManager).startSession(12345L, program);
+
+        when(programService.startProgramCreation(TEST_USER_ID, "My Awesome Program")).thenReturn(program);
+        doNothing().when(sessionManager).startSession(TEST_USER_ID, program);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertTrue(response.getText().contains("Started creating program: \"My Awesome Program\""));
-        assertTrue(response.getText().contains("/finish_program to complete the process"));
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).contains("Started creating program: \"My Awesome Program\"");
+        assertThat(response.getText()).contains("/finish_program to complete the process");
 
-        verify(programService).startProgramCreation(12345L, "My Awesome Program");
-        verify(sessionManager).startSession(12345L, program);
+        verify(programService).startProgramCreation(TEST_USER_ID, "My Awesome Program");
+        verify(sessionManager).startSession(TEST_USER_ID, program);
+        verifyNoMoreInteractions(programService, sessionManager);
     }
 
     @Test
-    void testHandleSuccessWithoutName() {
+    void testHandleSuccessWithoutName() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program");
-        when(sessionManager.hasActiveSession(12345L)).thenReturn(false);
-        
+        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(false);
+
         Program program = new Program();
         program.setId(1L);
         program.setName("My Program");
         User user = new User();
         user.setId(1L);
         program.setUser(user);
-        
-        when(programService.startProgramCreation(12345L, "My Program")).thenReturn(program);
-        doNothing().when(sessionManager).startSession(12345L, program);
+
+        when(programService.startProgramCreation(TEST_USER_ID, "My Program")).thenReturn(program);
+        doNothing().when(sessionManager).startSession(TEST_USER_ID, program);
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertTrue(response.getText().contains("Started creating program: \"My Program\""));
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).contains("Started creating program: \"My Program\"");
 
-        verify(programService).startProgramCreation(12345L, "My Program");
-        verify(sessionManager).startSession(12345L, program);
+        verify(programService).startProgramCreation(TEST_USER_ID, "My Program");
+        verify(sessionManager).startSession(TEST_USER_ID, program);
+        verifyNoMoreInteractions(programService, sessionManager);
     }
 
     @Test
-    void testHandleWithError() {
+    void testHandleWithError() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program Test Program");
-        when(sessionManager.hasActiveSession(12345L)).thenReturn(false);
-        when(programService.startProgramCreation(12345L, "Test Program"))
+        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(false);
+        when(programService.startProgramCreation(TEST_USER_ID, "Test Program"))
                 .thenThrow(new RuntimeException("Database error"));
 
         // When
         SendMessage response = handler.handle(update);
 
         // Then
-        assertNotNull(response);
-        assertEquals("6789", response.getChatId());
-        assertTrue(response.getText().contains("Sorry, there was an error starting program creation"));
+        assertThat(response).isNotNull();
+        assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
+        assertThat(response.getText()).contains("Sorry, there was an error starting program creation");
 
-        verify(programService).startProgramCreation(12345L, "Test Program");
+        verify(programService).startProgramCreation(TEST_USER_ID, "Test Program");
         verify(sessionManager, never()).startSession(anyLong(), any());
+        verifyNoMoreInteractions(programService, sessionManager);
     }
 
     private Update createMockUpdateWithCommand(String command) {
@@ -141,8 +151,8 @@ class CreateProgramCommandHandlerTest {
         when(update.getMessage()).thenReturn(message);
         when(message.getText()).thenReturn(command);
         when(message.getFrom()).thenReturn(user);
-        when(user.getId()).thenReturn(12345L);
-        when(message.getChatId()).thenReturn(6789L);
+        when(user.getId()).thenReturn(TEST_USER_ID);
+        when(message.getChatId()).thenReturn(TEST_CHAT_ID);
 
         return update;
     }

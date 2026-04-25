@@ -89,6 +89,9 @@ public class TrainingDayService {
 
         // 6. Save the training day (this will cascade to exercises)
         TrainingDay savedTrainingDay = trainingDayRepository.save(parsedTrainingDay);
+        if (savedTrainingDay.getExercises() != null) {
+            savedTrainingDay.getExercises().forEach(exercise -> exercise.setTrainingDay(savedTrainingDay));
+        }
 
         return savedTrainingDay;
     }

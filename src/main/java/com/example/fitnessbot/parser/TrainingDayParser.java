@@ -25,9 +25,11 @@ public class TrainingDayParser {
     private static final Logger log = LoggerFactory.getLogger(TrainingDayParser.class);
 
     // Pattern to capture a bullet line. Captures the whole line after the bullet marker.
-    private static final Pattern BULLET_PATTERN = Pattern.compile("[\\u2043\\-\\u2022\\u2023\\u25E6]\\s*(.+)");
-    // Pattern for sets × reps like "3 x 6" or "2 x 10" (allow spaces around 'x')
-    private static final Pattern SET_REP_PATTERN = Pattern.compile("(\\d+)\\s*[xхX]\\s*(\\d+|\\w+)");
+    private static final Pattern BULLET_PATTERN = Pattern.compile("^[\\u2043\\-\\u2022\\u2023\\u25E6\\*\\+\\u2219\\u2014\\u2013]\\s*(.+)");
+    // Pattern for sets x reps like "3 x 6", "3x8-10", "4x6+", or "2xMAX".
+    private static final Pattern SET_REP_PATTERN = Pattern.compile("(\\d+)\\s*[xхX]\\s*([\\p{L}\\d]+(?:-[\\p{L}\\d]+)?\\+?)");
+    private static final Pattern TRAILING_PAREN_NOTE_PATTERN = Pattern.compile("\\s+(\\([^)]*\\))\\s*$");
+    private static final Pattern TRAILING_REPS_ONLY_PATTERN = Pattern.compile("^(.*\\S)\\s+(AMRAP|MAX)$", Pattern.CASE_INSENSITIVE);
     // Pattern for any URL
     private static final Pattern URL_PATTERN = Pattern.compile("https?://[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+", Pattern.CASE_INSENSITIVE);
 
@@ -35,6 +37,10 @@ public class TrainingDayParser {
         TrainingDay day = new TrainingDay();
         List<Exercise> exercises = new ArrayList<>();
         day.setExercises(exercises);
+
+        if (rawText == null || rawText.isBlank()) {
+            return day;
+        }
 
         String[] lines = rawText.split("\\r?\\n");
         String currentSection = "General"; // Default section name
@@ -46,7 +52,11 @@ public class TrainingDayParser {
 
             // Section header – ends with ':'
             if (line.endsWith(":")) {
-                currentSection = line.substring(0, line.length() - 1).trim();
+                if (day.getTitle() == null && exercises.isEmpty() && looksLikeTrainingDayTitle(line)) {
+                    day.setTitle(line);
+                } else {
+                    currentSection = line.substring(0, line.length() - 1).trim();
+                }
                 continue;
             }
 
@@ -72,26 +82,37 @@ public class TrainingDayParser {
                 // Remove URLs from the text to simplify further parsing
                 String withoutUrls = content.replaceAll(URL_PATTERN.pattern(), "").trim();
 
-                // Try to find sets×reps pattern (handle multiple occurrences)
+                // Try to find sets×reps pattern.
                 Matcher setRepMatcher = SET_REP_PATTERN.matcher(withoutUrls);
                 if (setRepMatcher.find()) {
                     ex.setSets(Integer.parseInt(setRepMatcher.group(1)));
                     ex.setRepsOrDuration(setRepMatcher.group(2));
-                    // Remove that part from name
+
                     String match = setRepMatcher.group();
-                    if (match != null) {
-                        withoutUrls = withoutUrls.replaceFirst(Pattern.quote(match), "").trim();
+                    String notes = withoutUrls.substring(setRepMatcher.end()).trim();
+                    boolean compactSetRep = !match.contains(" ");
+                    if (compactSetRep || !notes.isBlank()) {
+                        String name = withoutUrls.substring(0, setRepMatcher.start()).trim();
+                        ex.setName(name);
+                        setNotesIfPresent(ex, notes);
+                    } else {
+                        ex.setName(withoutUrls);
+                    }
+                } else {
+                    Matcher repsOnlyMatcher = TRAILING_REPS_ONLY_PATTERN.matcher(withoutUrls);
+                    if (repsOnlyMatcher.matches()) {
+                        ex.setName(repsOnlyMatcher.group(1).trim());
+                        ex.setRepsOrDuration(repsOnlyMatcher.group(2));
+                    } else {
+                        String name = withoutUrls;
+                        Matcher noteMatcher = TRAILING_PAREN_NOTE_PATTERN.matcher(name);
+                        if (noteMatcher.find()) {
+                            ex.setNotes(noteMatcher.group(1).trim());
+                            name = name.substring(0, noteMatcher.start()).trim();
+                        }
+                        ex.setName(name);
                     }
                 }
-
-                // The remaining text up to the first '(' is considered the name
-                String name = withoutUrls;
-                int parenIdx = name.indexOf('(');
-                if (parenIdx > 0) {
-                    ex.setNotes(name.substring(parenIdx).trim());
-                    name = name.substring(0, parenIdx).trim();
-                }
-                ex.setName(name);
 
                 exercises.add(ex);
             }
@@ -117,5 +138,17 @@ public class TrainingDayParser {
 
         // More sophisticated validation could be added here if needed
         return true;
+    }
+
+    private boolean looksLikeTrainingDayTitle(String line) {
+        String lower = line.toLowerCase();
+        return lower.contains("трен") || lower.contains("training") || lower.contains("workout");
+    }
+
+    private void setNotesIfPresent(Exercise exercise, String notes) {
+        if (notes == null || notes.isBlank()) {
+            return;
+        }
+        exercise.setNotes(notes);
     }
 }

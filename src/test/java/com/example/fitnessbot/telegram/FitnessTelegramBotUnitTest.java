@@ -2,6 +2,7 @@ package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import com.example.fitnessbot.telegram.commands.*;
 import com.example.fitnessbot.telegram.commands.CommandRegistryService;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,16 +34,16 @@ class FitnessTelegramBotUnitTest {
     @BeforeEach
     void setUp() {
         List<CommandHandler> commandHandlers = List.of(
-            new StartCommandHandler(),
-            new HelpCommandHandler(new CommandRegistryService()),
-            new MenuCommandHandler()
+            new StartCommandHandler(mock(MenuKeyboardFactory.class)),
+            new HelpCommandHandler(new CommandRegistryService(), mock(MenuKeyboardFactory.class)),
+            new MenuCommandHandler(mock(MenuKeyboardFactory.class))
         );
 
         List<CallbackQueryHandler> callbackQueryHandlers = List.of(
             new ShowDayCommandHandler(trainingDayService)
         );
 
-        FitnessTelegramBot bot = new FitnessTelegramBot(trainingDayService, new ProgramCreationSessionManager(), commandHandlers, callbackQueryHandlers, new CommandRegistryService(), "test-token", "test-username");
+        FitnessTelegramBot bot = new FitnessTelegramBot(trainingDayService, new ProgramCreationSessionManager(), commandHandlers, callbackQueryHandlers, new CommandRegistryService(), mock(MenuKeyboardFactory.class), "test-token", "test-username");
         fitnessTelegramBot = spy(bot);
     }
 

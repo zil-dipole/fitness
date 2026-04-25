@@ -7,12 +7,17 @@ import com.example.fitnessbot.repository.UserRepository;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.telegram.FitnessTelegramBot;
+import com.example.fitnessbot.telegram.MenuKeyboardFactory;
+import com.example.fitnessbot.telegram.commands.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 @SpringBootTest(classes = FitnessBotApplication.class)
 class TelegramBotIntegrationTest extends AbstractWithDbTest {
@@ -88,12 +93,13 @@ class TelegramBotIntegrationTest extends AbstractWithDbTest {
         // Test that all command handlers are created as beans and available
 
         // Create command handlers with minimal dependencies for testing instantiation
+        MenuKeyboardFactory menuKeyboardFactory = mock(MenuKeyboardFactory.class);
         java.util.List<com.example.fitnessbot.telegram.commands.CommandHandler> commandHandlers = java.util.List.of(
-                new com.example.fitnessbot.telegram.commands.StartCommandHandler(),
-                new com.example.fitnessbot.telegram.commands.HelpCommandHandler(new com.example.fitnessbot.telegram.commands.CommandRegistryService()),
-                new com.example.fitnessbot.telegram.commands.CreateProgramCommandHandler(null, null),  // Dependencies will be mocked in real usage
-                new com.example.fitnessbot.telegram.commands.FinishProgramCommandHandler(null, null),
-                new com.example.fitnessbot.telegram.commands.CancelProgramCommandHandler(null)
+                new com.example.fitnessbot.telegram.commands.StartCommandHandler(menuKeyboardFactory),
+                new com.example.fitnessbot.telegram.commands.HelpCommandHandler(new com.example.fitnessbot.telegram.commands.CommandRegistryService(), menuKeyboardFactory),
+                new com.example.fitnessbot.telegram.commands.CreateProgramCommandHandler(null, null, menuKeyboardFactory),  // Dependencies will be mocked in real usage
+                new com.example.fitnessbot.telegram.commands.FinishProgramCommandHandler(null, null, menuKeyboardFactory),
+                new com.example.fitnessbot.telegram.commands.CancelProgramCommandHandler(null, menuKeyboardFactory)
         );
 
         // Verify all handlers are instantiated
@@ -105,5 +111,108 @@ class TelegramBotIntegrationTest extends AbstractWithDbTest {
         assertThat(commandHandlers.get(2).canHandle("/create_program")).isTrue();
         assertThat(commandHandlers.get(3).canHandle("/finish_program")).isTrue();
         assertThat(commandHandlers.get(4).canHandle("/cancel_program")).isTrue();
+    }
+
+    @Test
+    void testContextAwareCommandAvailability() {
+        // Test context-aware command availability logic
+
+        // Create command handlers
+        MenuKeyboardFactory menuKeyboardFactory = mock(MenuKeyboardFactory.class);
+        StartCommandHandler startHandler = new StartCommandHandler(menuKeyboardFactory);
+        CreateProgramCommandHandler createHandler = new CreateProgramCommandHandler(null, sessionManager, menuKeyboardFactory);
+        FinishProgramCommandHandler finishHandler = new FinishProgramCommandHandler(null, sessionManager, menuKeyboardFactory);
+        CancelProgramCommandHandler cancelHandler = new CancelProgramCommandHandler(sessionManager, menuKeyboardFactory);
+
+        long testUserId = 54321L;
+
+        // Initially no session
+        assertThat(sessionManager.hasActiveSession(testUserId)).isFalse();
+
+        // Start command should be available
+        assertThat(startHandler.isAvailable(testUserId, sessionManager)).isTrue();
+
+        // Create program command should be available
+        assertThat(createHandler.isAvailable(testUserId, sessionManager)).isTrue();
+
+        // Finish and cancel commands should NOT be available
+        assertThat(finishHandler.isAvailable(testUserId, sessionManager)).isFalse();
+        assertThat(cancelHandler.isAvailable(testUserId, sessionManager)).isFalse();
+
+        // Start a session
+        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
+        program.setName("Context Test Program");
+        sessionManager.startSession(testUserId, program);
+
+        // Now check availabilities have changed appropriately
+
+        // Start command should NOT be available
+        assertThat(startHandler.isAvailable(testUserId, sessionManager)).isFalse();
+
+        // Create program command should NOT be available
+        assertThat(createHandler.isAvailable(testUserId, sessionManager)).isFalse();
+
+        // Finish and cancel commands SHOULD be available
+        assertThat(finishHandler.isAvailable(testUserId, sessionManager)).isTrue();
+        assertThat(cancelHandler.isAvailable(testUserId, sessionManager)).isTrue();
+
+        // End session
+        sessionManager.endSession(testUserId);
+
+        // Availabilities should revert
+        assertThat(startHandler.isAvailable(testUserId, sessionManager)).isTrue();
+        assertThat(createHandler.isAvailable(testUserId, sessionManager)).isTrue();
+        assertThat(finishHandler.isAvailable(testUserId, sessionManager)).isFalse();
+        assertThat(cancelHandler.isAvailable(testUserId, sessionManager)).isFalse();
+    }
+
+    @Test
+    void testMultipleUserSessionsAreIndependent() {
+        // Test that different users have independent session states
+
+        long user1Id = 10001L;
+        long user2Id = 10002L;
+        long user3Id = 10003L;
+
+        // All start with no sessions
+        assertThat(sessionManager.hasActiveSession(user1Id)).isFalse();
+        assertThat(sessionManager.hasActiveSession(user2Id)).isFalse();
+        assertThat(sessionManager.hasActiveSession(user3Id)).isFalse();
+
+        // User 1 starts a session
+        com.example.fitnessbot.model.Program program1 = new com.example.fitnessbot.model.Program();
+        program1.setName("User 1 Program");
+        sessionManager.startSession(user1Id, program1);
+
+        // Only user 1 should have an active session
+        assertThat(sessionManager.hasActiveSession(user1Id)).isTrue();
+        assertThat(sessionManager.hasActiveSession(user2Id)).isFalse();
+        assertThat(sessionManager.hasActiveSession(user3Id)).isFalse();
+
+        // User 2 starts a session
+        com.example.fitnessbot.model.Program program2 = new com.example.fitnessbot.model.Program();
+        program2.setName("User 2 Program");
+        sessionManager.startSession(user2Id, program2);
+
+        // Users 1 and 2 should have active sessions
+        assertThat(sessionManager.hasActiveSession(user1Id)).isTrue();
+        assertThat(sessionManager.hasActiveSession(user2Id)).isTrue();
+        assertThat(sessionManager.hasActiveSession(user3Id)).isFalse();
+
+        // User 1 ends session
+        sessionManager.endSession(user1Id);
+
+        // Only user 2 should have an active session
+        assertThat(sessionManager.hasActiveSession(user1Id)).isFalse();
+        assertThat(sessionManager.hasActiveSession(user2Id)).isTrue();
+        assertThat(sessionManager.hasActiveSession(user3Id)).isFalse();
+
+        // User 2 ends session
+        sessionManager.endSession(user2Id);
+
+        // No users should have active sessions
+        assertThat(sessionManager.hasActiveSession(user1Id)).isFalse();
+        assertThat(sessionManager.hasActiveSession(user2Id)).isFalse();
+        assertThat(sessionManager.hasActiveSession(user3Id)).isFalse();
     }
 }

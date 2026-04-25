@@ -293,12 +293,19 @@ class TrainingDayServiceTest {
         savedTrainingDay.setRawText(rawText);
         savedTrainingDay.setTitle("Треня 1:");
         
-        exercise1.setTrainingDay(savedTrainingDay);
-        exercise1.setPosition(0);
-        exercise2.setTrainingDay(savedTrainingDay);
-        exercise2.setPosition(1);
+        Exercise savedExercise1 = new Exercise();
+        savedExercise1.setName("Бег 5 мин");
+        savedExercise1.setSection("Разминка");
+        savedExercise1.setTrainingDay(savedTrainingDay);
+        savedExercise1.setPosition(0);
+
+        Exercise savedExercise2 = new Exercise();
+        savedExercise2.setName("Растяжка 10 мин");
+        savedExercise2.setSection("Разминка");
+        savedExercise2.setTrainingDay(savedTrainingDay);
+        savedExercise2.setPosition(1);
         
-        savedTrainingDay.setExercises(List.of(exercise1, exercise2));
+        savedTrainingDay.setExercises(List.of(savedExercise1, savedExercise2));
         
         when(userRepository.findByTelegramId(TEST_TELEGRAM_ID)).thenReturn(Optional.of(user));
         when(parser.parse(rawText)).thenReturn(parsedTrainingDay);

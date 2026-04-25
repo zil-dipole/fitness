@@ -15,23 +15,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
-import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.List;
 import java.util.ArrayList;
 
 @Component
 @ConditionalOnProperty(name = "telegram.bot.token")
-public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKeyboardFactory {
+public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private static final Logger log = LoggerFactory.getLogger(FitnessTelegramBot.class);
 
@@ -112,12 +108,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKe
                     
                     sendTelegramMessage(message);
                     
-                    // Acknowledge the callback query to remove loading indicator
-                    if (callbackQuery.getId() != null) {
-                        AnswerCallbackQuery answer = new AnswerCallbackQuery();
-                        answer.setCallbackQueryId(callbackQuery.getId());
-                        execute(answer);
-                    }
+                    acknowledgeCallbackQuery(callbackQuery, null);
                     
                     return;
                 }
@@ -215,14 +206,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKe
 
             sendTelegramMessage(message);
 
-            // Acknowledge the callback query to remove loading indicator
-            // Only if callbackQueryId is not null (e.g., in real Telegram environment)
-            // Skip actual Telegram API calls during testing
-            if (callbackQuery.getId() != null && !"true".equals(System.getProperty("test.profile"))) {
-                AnswerCallbackQuery answer = new AnswerCallbackQuery();
-                answer.setCallbackQueryId(callbackQuery.getId());
-                execute(answer);
-            }
+            acknowledgeCallbackQuery(callbackQuery, null);
         } catch (Exception e) {
             log.error("Error handling callback query: {}", callbackData, e);
             try {
@@ -231,13 +215,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKe
                 errorMessage.setText("Sorry, there was an error processing your request. Please try again.");
                 sendTelegramMessage(errorMessage);
 
-                // Acknowledge the callback query even in case of error
-                // Skip actual Telegram API calls during testing
-                if (callbackQuery.getId() != null && !"true".equals(System.getProperty("test.profile"))) {
-                    AnswerCallbackQuery answer = new AnswerCallbackQuery();
-                    answer.setCallbackQueryId(callbackQuery.getId());
-                    execute(answer);
-                }
+                acknowledgeCallbackQuery(callbackQuery, null);
             } catch (Exception telegramException) {
                 log.warn("Failed to acknowledge callback query: {} for callback data: {}. Error: {}", 
                         callbackQuery.getId(), callbackData, telegramException.getMessage());
@@ -252,19 +230,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKe
         String callbackData = callbackQuery.getData();
         String command = callbackData.substring(4); // Remove "cmd:" prefix
 
-        // Acknowledge the callback query
-        // Skip actual Telegram API calls during testing
-        if (callbackQuery.getId() != null && !"true".equals(System.getProperty("test.profile"))) {
-            try {
-                AnswerCallbackQuery answer = new AnswerCallbackQuery();
-                answer.setCallbackQueryId(callbackQuery.getId());
-                answer.setText("Executing: " + command);
-                execute(answer);
-            } catch (Exception e) {
-                log.warn("Failed to acknowledge command suggestion callback query: {} for command: {}. Error: {}", 
-                        callbackQuery.getId(), command, e.getMessage());
-            }
-        }
+        acknowledgeCallbackQuery(callbackQuery, "Executing: " + command);
 
         // Create a fake update to simulate the command being sent
         Update fakeUpdate = new Update();
@@ -289,57 +255,8 @@ public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKe
      *
      * @param userId The user ID to determine if they have an active session
      */
-    public MenuKeyboardFactory getMenuKeyboardFactory() {
-        return this;
-    }
-
-    /**
-     * Create the main menu inline keyboard
-
-        // First row - Create Program (only shown when no active session)
-        if (!sessionManager.hasActiveSession(userId)) {
-            List<InlineKeyboardButton> firstRow = new ArrayList<>();
-            InlineKeyboardButton createProgramBtn = new InlineKeyboardButton();
-            createProgramBtn.setText("Create Program");
-            createProgramBtn.setCallbackData("create_program");
-            firstRow.add(createProgramBtn);
-
-            InlineKeyboardButton viewProgramsBtn = new InlineKeyboardButton();
-            viewProgramsBtn.setText("View Programs");
-            viewProgramsBtn.setCallbackData("view_programs");
-            firstRow.add(viewProgramsBtn);
-
-            rows.add(firstRow);
-        }
-
-        // Cancel/Finish Program (only shown when active session exists)
-        if (sessionManager.hasActiveSession(userId)) {
-            List<InlineKeyboardButton> sessionControlRow = new ArrayList<>();
-            
-            InlineKeyboardButton finishProgramBtn = new InlineKeyboardButton();
-            finishProgramBtn.setText("Finish Program");
-            finishProgramBtn.setCallbackData("finish_program");
-            sessionControlRow.add(finishProgramBtn);
-            
-            InlineKeyboardButton cancelProgramBtn = new InlineKeyboardButton();
-            cancelProgramBtn.setText("Cancel Program");
-            cancelProgramBtn.setCallbackData("cancel_program");
-            sessionControlRow.add(cancelProgramBtn);
-            
-            rows.add(sessionControlRow);
-        }
-
-        // Last row - Help
-        List<InlineKeyboardButton> lastRow = new ArrayList<>();
-        InlineKeyboardButton helpBtn = new InlineKeyboardButton();
-        helpBtn.setText("Help");
-        helpBtn.setCallbackData("help");
-        lastRow.add(helpBtn);
-
-        rows.add(lastRow);
-
-        markup.setKeyboard(rows);
-        return markup;
+    public InlineKeyboardMarkup createMainMenuKeyboard(Long userId) {
+        return menuKeyboardFactory.createMainMenuKeyboard(userId);
     }
 
     private void handleForwardedMessage(Update update) {
@@ -648,6 +565,22 @@ public class FitnessTelegramBot extends TelegramLongPollingBot implements MenuKe
                          sendMessage.getChatId(), e.getMessage(), e);
                 throw e;
             }
+        }
+    }
+
+    private void acknowledgeCallbackQuery(CallbackQuery callbackQuery, String text) {
+        if (callbackQuery.getId() == null || "true".equals(System.getProperty("test.profile"))) {
+            return;
+        }
+
+        try {
+            AnswerCallbackQuery answer = new AnswerCallbackQuery();
+            answer.setCallbackQueryId(callbackQuery.getId());
+            answer.setText(text);
+            execute(answer);
+        } catch (Exception e) {
+            log.warn("Failed to acknowledge callback query: {} for callback data: {}. Error: {}",
+                    callbackQuery.getId(), callbackQuery.getData(), e.getMessage());
         }
     }
 }

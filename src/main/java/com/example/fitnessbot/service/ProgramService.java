@@ -96,7 +96,9 @@ public class ProgramService {
      * @return List of programs
      */
     public List<Program> getProgramsForUser(Long telegramUserId) {
-        return programRepository.findByUserId(telegramUserId);
+        return userRepository.findByTelegramId(telegramUserId)
+                .map(user -> programRepository.findByUserId(user.getId()))
+                .orElseGet(List::of);
     }
 
     /**
@@ -106,7 +108,8 @@ public class ProgramService {
      * @return The program if found
      */
     public Optional<Program> getProgramForUser(Long programId, Long telegramUserId) {
-        return programRepository.findByIdAndUserId(programId, telegramUserId);
+        return userRepository.findByTelegramId(telegramUserId)
+                .flatMap(user -> programRepository.findByIdAndUserId(programId, user.getId()));
     }
 
     /**
