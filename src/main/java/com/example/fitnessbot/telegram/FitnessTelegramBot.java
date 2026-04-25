@@ -15,10 +15,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
+import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeAllPrivateChats;
+import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
@@ -64,9 +68,19 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     @PostConstruct
     public void registerCommands() {
-        // We don't register global commands to avoid showing contextually inappropriate commands
-        // Instead, we rely on context-aware keyboards and direct command handling
-        log.info("Bot initialized without global command registration for context-sensitive behavior");
+        if ("true".equals(System.getProperty("test.profile"))) {
+            log.info("Skipping Telegram command menu registration in test profile");
+            return;
+        }
+
+        List<BotCommand> commands = createTelegramCommandMenu();
+        try {
+            execute(new SetMyCommands(commands, new BotCommandScopeDefault(), null));
+            execute(new SetMyCommands(commands, new BotCommandScopeAllPrivateChats(), null));
+            log.info("Registered Telegram command menu with {} globally visible commands", commands.size());
+        } catch (Exception e) {
+            log.warn("Failed to register Telegram command menu", e);
+        }
     }
     
     @Override
@@ -437,21 +451,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
         // Filter commands to only include available commands for context-aware handlers
         List<CommandMetadata> availableCommands = commandRegistryService.getAllCommands().stream()
-                .filter(cmd -> {
-                    // Find the handler for this command
-                    CommandHandler handler = commandHandlers.stream()
-                            .filter(h -> h.canHandle(cmd.getCommand()))
-                            .findFirst()
-                            .orElse(null);
-
-                    // If it's a context-aware handler, check if it's available
-                    if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
-                        return contextAwareHandler.isAvailable(userId, sessionManager);
-                    }
-
-                    // Non-context-aware commands are always available
-                    return true;
-                })
+                .filter(cmd -> isCommandAvailable(cmd, userId))
                 .toList();
 
         // Create inline keyboard with available commands
@@ -479,21 +479,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
         // Filter suggestions to only include available commands for context-aware handlers
         suggestions = suggestions.stream()
-                .filter(cmd -> {
-                    // Find the handler for this command
-                    CommandHandler handler = commandHandlers.stream()
-                            .filter(h -> h.canHandle(cmd.getCommand()))
-                            .findFirst()
-                            .orElse(null);
-
-                    // If it's a context-aware handler, check if it's available
-                    if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
-                        return contextAwareHandler.isAvailable(userId, sessionManager);
-                    }
-
-                    // Non-context-aware commands are always available
-                    return true;
-                })
+                .filter(cmd -> isCommandAvailable(cmd, userId))
                 .toList();
 
         if (!suggestions.isEmpty()) {
@@ -554,6 +540,33 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
         markup.setKeyboard(rows);
         return markup;
+    }
+
+    private boolean isCommandAvailable(CommandMetadata commandMetadata, Long userId) {
+        CommandHandler handler = commandHandlers.stream()
+                .filter(h -> h.canHandle(commandMetadata.getCommand()))
+                .findFirst()
+                .orElse(null);
+
+        if (handler == null) {
+            return false;
+        }
+
+        if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
+            return contextAwareHandler.isAvailable(userId, sessionManager);
+        }
+
+        return true;
+    }
+
+    List<BotCommand> createTelegramCommandMenu() {
+        return List.of(
+                new BotCommand("start", "Start the bot"),
+                new BotCommand("help", "Show help"),
+                new BotCommand("menu", "Show main menu"),
+                new BotCommand("create_program", "Create a workout program"),
+                new BotCommand("show_program", "Show saved programs")
+        );
     }
 
     /**

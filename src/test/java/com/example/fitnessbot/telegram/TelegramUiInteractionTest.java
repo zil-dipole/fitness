@@ -197,6 +197,36 @@ class TelegramUiInteractionTest {
     }
 
     @Test
+    void testCommandMenuHidesSessionCommandsWithoutActiveSession() throws Exception {
+        Update update = createMockUpdateWithCommand("/");
+        fitnessTelegramBot.onUpdateReceived(update);
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot).sendTelegramMessage(captor.capture());
+
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) captor.getValue().getReplyMarkup();
+        assertFalse(commandKeyboardContains(markup, "/cancel_program"));
+        assertFalse(commandKeyboardContains(markup, "/finish_program"));
+        assertTrue(commandKeyboardContains(markup, "/create_program"));
+    }
+
+    @Test
+    void testCommandMenuShowsSessionCommandsWithActiveSession() throws Exception {
+        sessionManager.startSession(USER_ID, new com.example.fitnessbot.model.Program());
+
+        Update update = createMockUpdateWithCommand("/");
+        fitnessTelegramBot.onUpdateReceived(update);
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot).sendTelegramMessage(captor.capture());
+
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) captor.getValue().getReplyMarkup();
+        assertTrue(commandKeyboardContains(markup, "/cancel_program"));
+        assertTrue(commandKeyboardContains(markup, "/finish_program"));
+        assertFalse(commandKeyboardContains(markup, "/create_program"));
+    }
+
+    @Test
     void testHelpCallbackQuery() throws Exception {
         Update update = createMockUpdateWithCallbackQuery("help");
         fitnessTelegramBot.onUpdateReceived(update);
@@ -377,5 +407,11 @@ class TelegramUiInteractionTest {
         user.setTelegramId(USER_ID);
         trainingDay.setUser(user);
         return trainingDay;
+    }
+
+    private boolean commandKeyboardContains(InlineKeyboardMarkup markup, String command) {
+        return markup.getKeyboard().stream()
+                .flatMap(List::stream)
+                .anyMatch(button -> command.equals(button.getText()));
     }
 }

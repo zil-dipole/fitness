@@ -14,6 +14,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 
 import java.util.List;
 
@@ -50,6 +51,21 @@ class FitnessTelegramBotUnitTest {
     @Test
     void testGetBotUsername() {
         assertEquals("test-username", fitnessTelegramBot.getBotUsername());
+    }
+
+    @Test
+    void testTelegramNativeCommandMenuExcludesSessionOnlyCommands() {
+        List<String> commands = fitnessTelegramBot.createTelegramCommandMenu().stream()
+                .map(BotCommand::getCommand)
+                .toList();
+
+        assertTrue(commands.contains("start"));
+        assertTrue(commands.contains("help"));
+        assertTrue(commands.contains("menu"));
+        assertTrue(commands.contains("create_program"));
+        assertTrue(commands.contains("show_program"));
+        assertFalse(commands.contains("cancel_program"));
+        assertFalse(commands.contains("finish_program"));
     }
 
     @Test
