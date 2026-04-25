@@ -16,7 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = FitnessBotApplication.class)
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class DatabaseIntegrationTest {
 
