@@ -14,10 +14,12 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 @Component
 public class OpenAiTrainingDayParser {
@@ -69,6 +71,72 @@ public class OpenAiTrainingDayParser {
             21. Return valid JSON only.
             """;
 
+    private static final String TRAINING_DAY_SCHEMA = """
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "null" }
+                  ]
+                },
+                "exercises": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "position": { "type": "integer" },
+                      "section": { "type": "string" },
+                      "name": { "type": "string" },
+                      "sets": {
+                        "anyOf": [
+                          { "type": "integer" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "repsOrDuration": {
+                        "anyOf": [
+                          { "type": "string" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "videoUrls": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "notes": {
+                        "anyOf": [
+                          { "type": "string" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "lastWeightKg": {
+                        "anyOf": [
+                          { "type": "number" },
+                          { "type": "null" }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "position",
+                      "section",
+                      "name",
+                      "sets",
+                      "repsOrDuration",
+                      "videoUrls",
+                      "notes",
+                      "lastWeightKg"
+                    ]
+                  }
+                }
+              },
+              "required": ["title", "exercises"]
+            }
+            """;
+
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String model;
@@ -101,22 +169,10 @@ public class OpenAiTrainingDayParser {
             throw new TrainingDayException("AI parser is enabled for the user, but no API key is configured. Set OPENAI_API_KEY or NEBIUS_API_KEY");
         }
 
-        JsonNode requestBody = buildRequestBody(rawText);
-        OpenAiResponse response = restClient.post()
-                .uri("/responses")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .body(requestBody)
-                .retrieve()
-                .body(OpenAiResponse.class);
+        String jsonPayload = usesChatCompletionsFirst()
+                ? parseWithChatCompletions(rawText)
+                : parseWithResponsesThenFallback(rawText);
 
-        if (response == null) {
-            throw new TrainingDayException("OpenAI parser returned an empty response");
-        }
-        if (StringUtils.hasText(response.errorMessage())) {
-            throw new TrainingDayException("OpenAI parser request failed: " + response.errorMessage());
-        }
-
-        String jsonPayload = response.extractFirstText();
         if (!StringUtils.hasText(jsonPayload)) {
             throw new TrainingDayException("OpenAI parser did not return structured training data");
         }
@@ -129,7 +185,119 @@ public class OpenAiTrainingDayParser {
         }
     }
 
-    private JsonNode buildRequestBody(String rawText) throws TrainingDayException {
+    private String parseWithResponsesThenFallback(String rawText) throws TrainingDayException {
+        try {
+            OpenAiResponse response = restClient.post()
+                    .uri("/responses")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .body(buildResponsesRequestBody(rawText))
+                    .retrieve()
+                    .body(OpenAiResponse.class);
+            return extractResponseText(response);
+        } catch (RestClientResponseException e) {
+            if (shouldFallbackToChatCompletions(e)) {
+                return parseWithChatCompletions(rawText);
+            }
+            throw requestFailedException(e);
+        }
+    }
+
+    private String parseWithChatCompletions(String rawText) throws TrainingDayException {
+        return parseWithChatCompletions(rawText, true);
+    }
+
+    private String parseWithChatCompletions(String rawText, boolean structuredOutput) throws TrainingDayException {
+        try {
+            ChatCompletionResponse response = restClient.post()
+                    .uri("/chat/completions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .body(buildChatCompletionsRequestBody(rawText, structuredOutput))
+                    .retrieve()
+                    .body(ChatCompletionResponse.class);
+            return extractChatCompletionText(response);
+        } catch (RestClientResponseException e) {
+            if (structuredOutput && shouldRetryChatWithoutStructuredOutput(e)) {
+                return parseWithChatCompletions(rawText, false);
+            }
+            throw requestFailedException(e);
+        }
+    }
+
+    private String extractResponseText(OpenAiResponse response) {
+        if (response == null) {
+            throw new TrainingDayException("OpenAI parser returned an empty response");
+        }
+        if (StringUtils.hasText(response.errorMessage())) {
+            throw new TrainingDayException("OpenAI parser request failed: " + response.errorMessage());
+        }
+        return response.extractFirstText();
+    }
+
+    private String extractChatCompletionText(ChatCompletionResponse response) {
+        if (response == null) {
+            throw new TrainingDayException("OpenAI parser returned an empty response");
+        }
+        if (StringUtils.hasText(response.errorMessage())) {
+            throw new TrainingDayException("OpenAI parser request failed: " + response.errorMessage());
+        }
+        return response.extractFirstText();
+    }
+
+    private boolean usesChatCompletionsFirst() {
+        return StringUtils.hasText(model)
+                && model.toLowerCase(Locale.ROOT).startsWith("openai/gpt-oss");
+    }
+
+    private boolean shouldFallbackToChatCompletions(RestClientResponseException e) {
+        int statusCode = e.getStatusCode().value();
+        String body = e.getResponseBodyAsString();
+        return statusCode == 404
+                || (body != null && body.toLowerCase(Locale.ROOT).contains("responses api"));
+    }
+
+    private boolean shouldRetryChatWithoutStructuredOutput(RestClientResponseException e) {
+        String body = e.getResponseBodyAsString();
+        if (body == null) {
+            return false;
+        }
+
+        String normalizedBody = body.toLowerCase(Locale.ROOT);
+        return normalizedBody.contains("response_format")
+                || normalizedBody.contains("json_schema")
+                || normalizedBody.contains("structured output");
+    }
+
+    private TrainingDayException requestFailedException(RestClientResponseException e) {
+        return new TrainingDayException("OpenAI parser request failed: " + responseErrorMessage(e), e);
+    }
+
+    private String responseErrorMessage(RestClientResponseException e) {
+        String body = e.getResponseBodyAsString();
+        if (!StringUtils.hasText(body)) {
+            return e.getStatusCode() + " " + e.getStatusText();
+        }
+
+        try {
+            JsonNode error = objectMapper.readTree(body);
+            JsonNode openAiErrorMessage = error.path("error").path("message");
+            if (openAiErrorMessage.isTextual() && StringUtils.hasText(openAiErrorMessage.asText())) {
+                return openAiErrorMessage.asText();
+            }
+            JsonNode detail = error.path("detail");
+            if (detail.isTextual() && StringUtils.hasText(detail.asText())) {
+                return detail.asText();
+            }
+            JsonNode message = error.path("message");
+            if (message.isTextual() && StringUtils.hasText(message.asText())) {
+                return message.asText();
+            }
+        } catch (Exception ignored) {
+            // Fall through to the raw response body below.
+        }
+        return body;
+    }
+
+    private JsonNode buildResponsesRequestBody(String rawText) throws TrainingDayException {
         try {
             String payload = """
                     {
@@ -159,76 +327,53 @@ public class OpenAiTrainingDayParser {
                           "type": "json_schema",
                           "name": "training_day_parse",
                           "strict": true,
-                          "schema": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "properties": {
-                              "title": {
-                                "anyOf": [
-                                  { "type": "string" },
-                                  { "type": "null" }
-                                ]
-                              },
-                              "exercises": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "additionalProperties": false,
-                                  "properties": {
-                                    "position": { "type": "integer" },
-                                    "section": { "type": "string" },
-                                    "name": { "type": "string" },
-                                    "sets": {
-                                      "anyOf": [
-                                        { "type": "integer" },
-                                        { "type": "null" }
-                                      ]
-                                    },
-                                    "repsOrDuration": {
-                                      "anyOf": [
-                                        { "type": "string" },
-                                        { "type": "null" }
-                                      ]
-                                    },
-                                    "videoUrls": {
-                                      "type": "array",
-                                      "items": { "type": "string" }
-                                    },
-                                    "notes": {
-                                      "anyOf": [
-                                        { "type": "string" },
-                                        { "type": "null" }
-                                      ]
-                                    },
-                                    "lastWeightKg": {
-                                      "anyOf": [
-                                        { "type": "number" },
-                                        { "type": "null" }
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "position",
-                                    "section",
-                                    "name",
-                                    "sets",
-                                    "repsOrDuration",
-                                    "videoUrls",
-                                    "notes",
-                                    "lastWeightKg"
-                                  ]
-                                }
-                              }
-                            },
-                            "required": ["title", "exercises"]
-                          }
+                          "schema": %s
                         }
                       }
                     }
                     """.formatted(
                     escapeJson(model),
                     objectMapper.writeValueAsString(PARSING_PROMPT),
-                    objectMapper.writeValueAsString(rawText)
+                    objectMapper.writeValueAsString(rawText),
+                    TRAINING_DAY_SCHEMA
+            );
+            return objectMapper.readTree(payload);
+        } catch (Exception e) {
+            throw new TrainingDayException("Failed to build OpenAI parser request", e);
+        }
+    }
+
+    private JsonNode buildChatCompletionsRequestBody(String rawText, boolean structuredOutput) throws TrainingDayException {
+        try {
+            String payload = """
+                    {
+                      "model": "%s",
+                      "messages": [
+                        {
+                          "role": "system",
+                          "content": %s
+                        },
+                        {
+                          "role": "user",
+                          "content": %s
+                        }
+                      ]%s
+                    }
+                    """.formatted(
+                    escapeJson(model),
+                    objectMapper.writeValueAsString(PARSING_PROMPT),
+                    objectMapper.writeValueAsString(rawText),
+                    structuredOutput ? """
+                            ,
+                              "response_format": {
+                                "type": "json_schema",
+                                "json_schema": {
+                                  "name": "training_day_parse",
+                                  "strict": true,
+                                  "schema": %s
+                                }
+                              }
+                            """.formatted(TRAINING_DAY_SCHEMA) : ""
             );
             return objectMapper.readTree(payload);
         } catch (Exception e) {
@@ -304,6 +449,33 @@ public class OpenAiTrainingDayParser {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record ErrorBody(String message) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ChatCompletionResponse(List<ChatChoice> choices, ErrorBody error) {
+        String extractFirstText() {
+            if (choices == null) {
+                return null;
+            }
+            for (ChatChoice choice : choices) {
+                if (choice != null && choice.message() != null && StringUtils.hasText(choice.message().content())) {
+                    return choice.message().content();
+                }
+            }
+            return null;
+        }
+
+        String errorMessage() {
+            return error == null ? null : error.message();
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ChatChoice(ChatMessage message) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ChatMessage(String content) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

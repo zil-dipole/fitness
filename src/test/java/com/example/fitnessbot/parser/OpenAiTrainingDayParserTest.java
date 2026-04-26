@@ -5,6 +5,7 @@ import com.example.fitnessbot.model.TrainingDay;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.http.HttpMethod.POST;
 
@@ -56,6 +58,110 @@ class OpenAiTrainingDayParserTest {
         assertThat(result.getExercises().get(1).getLastWeightKg()).isEqualTo(70.0);
         assertThat(result.getExercises().get(1).getVideoUrls()).containsExactly("https://example.com/bench");
 
+        server.verify();
+    }
+
+    @Test
+    void parseFallsBackToChatCompletionsWhenResponsesApiIsUnsupported() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClient client = builder.build();
+        OpenAiTrainingDayParser parser = new OpenAiTrainingDayParser(client, new ObjectMapper(), "gpt-4o-mini", "test-key");
+
+        server.expect(requestTo("http://localhost/responses"))
+                .andExpect(method(POST))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                { "detail": "This model does not support Responses API" }
+                                """));
+        server.expect(requestTo("http://localhost/chat/completions"))
+                .andExpect(method(POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andRespond(withSuccess("""
+                        {
+                          "choices": [
+                            {
+                              "message": {
+                                "content": "{\\"title\\":\\"Workout B\\",\\"exercises\\":[]}"
+                              }
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        TrainingDay result = parser.parse("Workout B");
+
+        assertThat(result.getTitle()).isEqualTo("Workout B");
+        assertThat(result.getExercises()).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void parseUsesChatCompletionsFirstForGptOssProviderModel() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClient client = builder.build();
+        OpenAiTrainingDayParser parser = new OpenAiTrainingDayParser(client, new ObjectMapper(), "openai/gpt-oss-120b-fast", "test-key");
+
+        server.expect(requestTo("http://localhost/chat/completions"))
+                .andExpect(method(POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andRespond(withSuccess("""
+                        {
+                          "choices": [
+                            {
+                              "message": {
+                                "content": "{\\"title\\":\\"Workout C\\",\\"exercises\\":[]}"
+                              }
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        TrainingDay result = parser.parse("Workout C");
+
+        assertThat(result.getTitle()).isEqualTo("Workout C");
+        assertThat(result.getExercises()).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void parseRetriesChatCompletionsWithoutStructuredOutputWhenProviderRejectsJsonSchema() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClient client = builder.build();
+        OpenAiTrainingDayParser parser = new OpenAiTrainingDayParser(client, new ObjectMapper(), "openai/gpt-oss-120b-fast", "test-key");
+
+        server.expect(requestTo("http://localhost/chat/completions"))
+                .andExpect(method(POST))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                { "message": "response_format json_schema is not supported by this model" }
+                                """));
+        server.expect(requestTo("http://localhost/chat/completions"))
+                .andExpect(method(POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andRespond(withSuccess("""
+                        {
+                          "choices": [
+                            {
+                              "message": {
+                                "content": "{\\"title\\":\\"Workout D\\",\\"exercises\\":[]}"
+                              }
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        TrainingDay result = parser.parse("Workout D");
+
+        assertThat(result.getTitle()).isEqualTo("Workout D");
+        assertThat(result.getExercises()).isEmpty();
         server.verify();
     }
 

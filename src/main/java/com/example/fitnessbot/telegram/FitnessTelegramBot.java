@@ -1,5 +1,6 @@
 package com.example.fitnessbot.telegram;
 
+import com.example.fitnessbot.exception.TrainingDayException;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
@@ -145,10 +146,9 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             // Handle main menu callbacks (existing functionality)
             switch (callbackData) {
                 case "create_program":
-                    message.setText("To create a program, use the /create_program <name> command.\nExample: /create_program My Workout Plan");
-                    // Add menu keyboard to create program message
-                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
-                    break;
+                    handleCommandCallback(callbackQuery, "/create_program");
+                    acknowledgeCallbackQuery(callbackQuery, null);
+                    return;
                 case "view_programs":
                     handleCommandCallback(callbackQuery, "/show_program");
                     acknowledgeCallbackQuery(callbackQuery, null);
@@ -324,6 +324,18 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             } catch (Exception telegramApiException) {
                 log.error("Failed to send error message to user", telegramApiException);
             }
+        } catch (TrainingDayException e) {
+            log.warn("Parser error when processing forwarded message from user {}: {}", userId, e.getMessage());
+
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(update.getMessage().getChatId().toString());
+            sendMessage.setText("❌ Sorry, the training day parser failed: " + e.getMessage());
+
+            try {
+                sendTelegramMessage(sendMessage);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send error message to user", telegramApiException);
+            }
         } catch (org.springframework.dao.DataAccessException e) {
             log.error("Database error when processing forwarded message from user " + userId, e);
 
@@ -371,6 +383,18 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
 
             sendTelegramMessage(sendMessage);
+        } catch (TrainingDayException e) {
+            log.warn("Parser error during program creation for user {}: {}", userId, e.getMessage());
+
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(update.getMessage().getChatId().toString());
+            sendMessage.setText("❌ Sorry, the training day parser failed: " + e.getMessage());
+
+            try {
+                sendTelegramMessage(sendMessage);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send error message to user", telegramApiException);
+            }
         } catch (Exception e) {
             log.error("Error processing forwarded message during program creation for user " + userId, e);
 

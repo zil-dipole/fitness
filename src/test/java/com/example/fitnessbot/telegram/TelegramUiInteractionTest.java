@@ -246,6 +246,11 @@ class TelegramUiInteractionTest {
 
     @Test
     void testCreateProgramCallbackQuery() throws Exception {
+        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
+        program.setId(1L);
+        program.setName("My Program");
+        when(programService.startProgramCreation(USER_ID, "My Program")).thenReturn(program);
+
         Update update = createMockUpdateWithCallbackQuery("create_program");
         fitnessTelegramBot.onUpdateReceived(update);
 
@@ -254,7 +259,9 @@ class TelegramUiInteractionTest {
 
         SendMessage sentMessage = captor6.getValue();
         assertNotNull(sentMessage);
-        assertTrue(sentMessage.getText().contains("To create a program"));
+        assertTrue(sentMessage.getText().contains("Started creating program"));
+        assertTrue(sentMessage.getText().contains("My Program"));
+        assertTrue(sessionManager.hasActiveSession(USER_ID));
     }
 
     @Test
@@ -346,6 +353,47 @@ class TelegramUiInteractionTest {
                         && message.getText().contains("Finish Program")
                         && message.getText().contains("/finish_program")
                         && message.getReplyMarkup() instanceof InlineKeyboardMarkup
+        ));
+    }
+
+    @Test
+    void testProgramCreationButtonWorkflowWithForwardedTrainingDays() throws Exception {
+        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
+        program.setId(1L);
+        program.setName("My Program");
+        when(programService.startProgramCreation(USER_ID, "My Program")).thenReturn(program);
+        when(trainingDayService.processForwardedMessage(eq(USER_ID), anyString()))
+                .thenReturn(trainingDay(1L), trainingDay(2L));
+
+        Update createUpdate = createMockUpdateWithCallbackQuery("create_program");
+        fitnessTelegramBot.onUpdateReceived(createUpdate);
+
+        assertTrue(sessionManager.hasActiveSession(USER_ID));
+
+        Update forwardUpdate1 = createMockForwardedMessage("AI parsed day 1");
+        fitnessTelegramBot.onUpdateReceived(forwardUpdate1);
+
+        Update forwardUpdate2 = createMockForwardedMessage("AI parsed day 2");
+        fitnessTelegramBot.onUpdateReceived(forwardUpdate2);
+
+        Update finishUpdate = createMockUpdateWithCommand("/finish_program");
+        fitnessTelegramBot.onUpdateReceived(finishUpdate);
+
+        verify(trainingDayService, times(2)).processForwardedMessage(eq(USER_ID), anyString());
+        verify(programService).addTrainingDayToProgram(1L, 1L, 1);
+        verify(programService).addTrainingDayToProgram(1L, 2L, 2);
+        assertFalse(sessionManager.hasActiveSession(USER_ID));
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot, atLeastOnce()).sendTelegramMessage(captor.capture());
+
+        assertTrue(captor.getAllValues().stream().anyMatch(message ->
+                message.getText() != null
+                        && message.getText().contains("Training day added to your program!")
+        ));
+        assertTrue(captor.getAllValues().stream().anyMatch(message ->
+                message.getText() != null
+                        && message.getText().contains("Program \"My Program\" created successfully!")
         ));
     }
 
