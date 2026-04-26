@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-allow-workout-set-load-description
+      author: developer
+      changes:
+        - dropNotNullConstraint:
+            tableName: workout_set_logs
+            columnName: weight_kg
+            columnDataType: double
+        - addColumn:
+            tableName: workout_set_logs
+            columns:
+              - column:
+                  name: load_description
+                  type: text

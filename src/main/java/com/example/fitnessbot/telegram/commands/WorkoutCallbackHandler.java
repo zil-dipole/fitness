@@ -20,6 +20,7 @@ public class WorkoutCallbackHandler implements CallbackQueryHandler {
     public boolean canHandle(CallbackQuery callbackQuery) {
         String data = callbackQuery.getData();
         return WorkoutMessageFormatter.START_ACTIVE_DAY_CALLBACK.equals(data)
+                || WorkoutMessageFormatter.NO_LOAD_CALLBACK.equals(data)
                 || WorkoutMessageFormatter.SKIP_EXERCISE_CALLBACK.equals(data)
                 || WorkoutMessageFormatter.FINISH_WORKOUT_CALLBACK.equals(data);
     }
@@ -47,6 +48,12 @@ public class WorkoutCallbackHandler implements CallbackQueryHandler {
                 return response;
             }
 
+            if (WorkoutMessageFormatter.NO_LOAD_CALLBACK.equals(data)) {
+                WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(telegramUserId, "none");
+                applyWorkoutResult(response, result);
+                return response;
+            }
+
             boolean finished = workoutService.finishActiveWorkout(telegramUserId);
             response.setText(finished ? "Training day finished." : "You don't have an active workout session.");
             return response;
@@ -62,7 +69,7 @@ public class WorkoutCallbackHandler implements CallbackQueryHandler {
             return;
         }
 
-        response.setText(result.message() + "\n\n" + WorkoutMessageFormatter.formatExerciseView(result.exerciseView()));
+        response.setText(WorkoutMessageFormatter.formatExerciseResult(result.message(), result.exerciseView()));
         response.setParseMode("HTML");
         response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard());
     }

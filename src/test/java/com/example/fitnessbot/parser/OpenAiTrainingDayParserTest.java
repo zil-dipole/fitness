@@ -65,6 +65,6 @@ class OpenAiTrainingDayParserTest {
 
         assertThatThrownBy(() -> parser.parse("Workout A"))
                 .isInstanceOf(TrainingDayException.class)
-                .hasMessageContaining("OPENAI_API_KEY");
+                .hasMessageContaining("OPENAI_API_KEY or NEBIUS_API_KEY");
     }
 }

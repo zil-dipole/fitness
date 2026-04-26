@@ -96,7 +96,7 @@ public class OpenAiTrainingDayParser {
             return emptyTrainingDay();
         }
         if (!StringUtils.hasText(apiKey)) {
-            throw new TrainingDayException("OpenAI parser is enabled for the user, but OPENAI_API_KEY is not configured");
+            throw new TrainingDayException("AI parser is enabled for the user, but no API key is configured. Set OPENAI_API_KEY or NEBIUS_API_KEY");
         }
 
         JsonNode requestBody = buildRequestBody(rawText);

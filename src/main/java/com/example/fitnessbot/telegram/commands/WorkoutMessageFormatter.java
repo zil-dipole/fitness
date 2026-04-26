@@ -4,7 +4,6 @@ import com.example.fitnessbot.service.WorkoutService;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
-import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -13,12 +12,17 @@ import java.util.stream.Collectors;
 public final class WorkoutMessageFormatter {
 
     public static final String START_ACTIVE_DAY_CALLBACK = "start_active_day";
+    public static final String NO_LOAD_CALLBACK = "none_load";
     public static final String SKIP_EXERCISE_CALLBACK = "skip_workout_exercise";
     public static final String FINISH_WORKOUT_CALLBACK = "finish_workout";
 
     private static final DateTimeFormatter HISTORY_DATE_FORMAT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
 
     private WorkoutMessageFormatter() {
+    }
+
+    public static String formatExerciseResult(String message, WorkoutService.WorkoutExerciseView view) {
+        return TrainingDayMessageFormatter.escapeHtml(message) + "\n\n" + formatExerciseView(view);
     }
 
     public static String formatExerciseView(WorkoutService.WorkoutExerciseView view) {
@@ -58,9 +62,9 @@ public final class WorkoutMessageFormatter {
 
         response.append("\n");
         appendHistory(response, view.history());
-        response.append("\nSend weight for set ")
+        response.append("\nSend load for set ")
                 .append(view.currentSetNumber())
-                .append(" in kg, for example: 60 or 60.5.");
+                .append(". Examples: 60, red band, bodyweight. Send none for no load.");
 
         return response.toString();
     }
@@ -76,6 +80,10 @@ public final class WorkoutMessageFormatter {
     }
 
     public static InlineKeyboardMarkup exerciseKeyboard() {
+        InlineKeyboardButton noLoadButton = new InlineKeyboardButton();
+        noLoadButton.setText("No Load");
+        noLoadButton.setCallbackData(NO_LOAD_CALLBACK);
+
         InlineKeyboardButton skipButton = new InlineKeyboardButton();
         skipButton.setText("Skip Exercise");
         skipButton.setCallbackData(SKIP_EXERCISE_CALLBACK);
@@ -85,33 +93,33 @@ public final class WorkoutMessageFormatter {
         finishButton.setCallbackData(FINISH_WORKOUT_CALLBACK);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(List.of(List.of(skipButton, finishButton)));
+        markup.setKeyboard(List.of(List.of(noLoadButton), List.of(skipButton, finishButton)));
         return markup;
     }
 
     private static void appendHistory(StringBuilder response, List<WorkoutService.WorkoutHistoryEntry> history) {
         if (history.isEmpty()) {
-            response.append("Previous weights: none yet.\n");
+            response.append("Previous loads: none yet.\n");
             return;
         }
 
-        response.append("Previous weights:\n");
+        response.append("Previous loads:\n");
         for (WorkoutService.WorkoutHistoryEntry entry : history) {
-            String weights = entry.weights().stream()
-                    .map(WorkoutMessageFormatter::formatWeight)
+            String loads = entry.loads().stream()
+                    .map(WorkoutMessageFormatter::formatLoad)
                     .collect(Collectors.joining(" / "));
             response.append("- ")
                     .append(entry.startedAt().format(HISTORY_DATE_FORMAT))
                     .append(": ")
-                    .append(weights)
-                    .append(" kg\n");
+                    .append(loads)
+                    .append("\n");
         }
     }
 
-    private static String formatWeight(Double weight) {
-        if (weight == null) {
-            return "";
+    private static String formatLoad(String load) {
+        if (load == null || load.isBlank()) {
+            return "no load";
         }
-        return BigDecimal.valueOf(weight).stripTrailingZeros().toPlainString();
+        return TrainingDayMessageFormatter.escapeHtml(load);
     }
 }

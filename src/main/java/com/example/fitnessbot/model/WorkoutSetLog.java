@@ -30,8 +30,11 @@ public class WorkoutSetLog {
     @Column(name = "set_number", nullable = false)
     private Integer setNumber;
 
-    @Column(name = "weight_kg", nullable = false)
+    @Column(name = "weight_kg")
     private Double weightKg;
+
+    @Column(name = "load_description", columnDefinition = "text")
+    private String loadDescription;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -90,6 +93,14 @@ public class WorkoutSetLog {
 
     public void setWeightKg(Double weightKg) {
         this.weightKg = weightKg;
+    }
+
+    public String getLoadDescription() {
+        return loadDescription;
+    }
+
+    public void setLoadDescription(String loadDescription) {
+        this.loadDescription = loadDescription;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -400,7 +400,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             if (result.dayCompleted() || !result.accepted()) {
                 response.setText(result.message());
             } else {
-                response.setText(result.message() + "\n\n" + WorkoutMessageFormatter.formatExerciseView(result.exerciseView()));
+                response.setText(WorkoutMessageFormatter.formatExerciseResult(result.message(), result.exerciseView()));
                 response.setParseMode("HTML");
                 response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard());
             }
@@ -415,7 +415,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             }
         } catch (Exception e) {
             log.error("Failed to handle workout input for user {}", userId, e);
-            response.setText("Sorry, there was an error saving your workout weight.");
+            response.setText("Sorry, there was an error saving your workout set.");
             try {
                 sendTelegramMessage(response);
             } catch (Exception telegramApiException) {

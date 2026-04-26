@@ -37,6 +37,7 @@ class WorkoutCallbackHandlerTest {
     @Test
     void canHandleWorkoutCallbacks() {
         assertThat(handler.canHandle(callback(WorkoutMessageFormatter.START_ACTIVE_DAY_CALLBACK))).isTrue();
+        assertThat(handler.canHandle(callback(WorkoutMessageFormatter.NO_LOAD_CALLBACK))).isTrue();
         assertThat(handler.canHandle(callback(WorkoutMessageFormatter.SKIP_EXERCISE_CALLBACK))).isTrue();
         assertThat(handler.canHandle(callback(WorkoutMessageFormatter.FINISH_WORKOUT_CALLBACK))).isTrue();
         assertThat(handler.canHandle(callback("unknown"))).isFalse();
@@ -54,8 +55,25 @@ class WorkoutCallbackHandlerTest {
         assertThat(response.getText()).contains("Exercise 1/2");
         assertThat(response.getText()).contains("Bench Press");
         assertThat(response.getText()).contains("https://video.example/bench");
-        assertThat(response.getText()).contains("25 Apr 2026: 55 / 57.5 / 60 kg");
+        assertThat(response.getText()).contains("25 Apr 2026: 55 kg / red band / no load");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
+        assertThat(markup.getKeyboard().getFirst().getFirst().getText()).isEqualTo("No Load");
+        assertThat(markup.getKeyboard().getFirst().getFirst().getCallbackData()).isEqualTo(WorkoutMessageFormatter.NO_LOAD_CALLBACK);
+    }
+
+    @Test
+    void noLoadButtonRecordsCurrentSetAsNoLoad() throws Exception {
+        when(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"))
+                .thenReturn(new WorkoutService.WeightEntryResult(true, false, "Saved set 1: no load.", exerciseView()));
+
+        SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
+
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("Saved set 1: no load.");
+        assertThat(response.getText()).contains("Exercise 1/2");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
+        verify(workoutService).recordWeightForCurrentSet(TELEGRAM_USER_ID, "none");
     }
 
     @Test
@@ -81,7 +99,7 @@ class WorkoutCallbackHandlerTest {
                 List.of("https://video.example/bench"),
                 List.of(new WorkoutService.WorkoutHistoryEntry(
                         LocalDateTime.of(2026, 4, 25, 12, 0),
-                        List.of(55.0, 57.5, 60.0)
+                        List.of("55 kg", "red band", "no load")
                 ))
         );
     }

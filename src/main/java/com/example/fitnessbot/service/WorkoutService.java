@@ -12,12 +12,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class WorkoutService {
 
     private static final int HISTORY_LOG_LIMIT = 30;
     private static final int HISTORY_SESSION_LIMIT = 3;
+    private static final Pattern WEIGHT_INPUT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)(?:\\s*(?:kg|kgs|kilogram|kilograms))?", Pattern.CASE_INSENSITIVE);
+    private static final Set<String> NO_LOAD_INPUTS = Set.of("-", "none", "no weight", "no load", "skip");
 
     public record WorkoutExerciseView(
             Long sessionId,
@@ -34,7 +38,7 @@ public class WorkoutService {
     ) {
     }
 
-    public record WorkoutHistoryEntry(LocalDateTime startedAt, List<Double> weights) {
+    public record WorkoutHistoryEntry(LocalDateTime startedAt, List<String> loads) {
     }
 
     public record WeightEntryResult(
@@ -43,6 +47,9 @@ public class WorkoutService {
             String message,
             WorkoutExerciseView exerciseView
     ) {
+    }
+
+    private record SetLoad(Double weightKg, String description, String displayValue) {
     }
 
     private final UserRepository userRepository;
@@ -112,12 +119,12 @@ public class WorkoutService {
 
     @Transactional
     public WeightEntryResult recordWeightForCurrentSet(Long telegramUserId, String input) throws WorkoutException {
-        Optional<Double> parsedWeight = parseWeight(input);
-        if (parsedWeight.isEmpty()) {
+        Optional<SetLoad> parsedLoad = parseSetLoad(input);
+        if (parsedLoad.isEmpty()) {
             return new WeightEntryResult(
                     false,
                     false,
-                    "Send weight in kg as a number, for example: 60 or 60.5.",
+                    "Send load for this set, for example: 60, red band, or bodyweight. Send none for no load.",
                     null
             );
         }
@@ -134,7 +141,7 @@ public class WorkoutService {
         }
 
         int savedSetNumber = session.getCurrentSetNumber();
-        double weightKg = parsedWeight.get();
+        SetLoad load = parsedLoad.get();
 
         WorkoutSetLog setLog = new WorkoutSetLog();
         setLog.setWorkoutSession(session);
@@ -142,12 +149,15 @@ public class WorkoutService {
         setLog.setTrainingDay(session.getTrainingDay());
         setLog.setExercise(exercise);
         setLog.setSetNumber(savedSetNumber);
-        setLog.setWeightKg(weightKg);
+        setLog.setWeightKg(load.weightKg());
+        setLog.setLoadDescription(load.description());
         setLog.setCreatedAt(LocalDateTime.now());
         workoutSetLogRepository.save(setLog);
 
-        exercise.setLastWeightKg(weightKg);
-        exerciseRepository.save(exercise);
+        if (load.weightKg() != null) {
+            exercise.setLastWeightKg(load.weightKg());
+            exerciseRepository.save(exercise);
+        }
 
         List<Exercise> exercises = orderedExercises(session.getTrainingDay());
         int totalSets = totalSets(exercise);
@@ -157,7 +167,7 @@ public class WorkoutService {
             return new WeightEntryResult(
                     true,
                     false,
-                    "Saved set " + savedSetNumber + ": " + formatWeight(weightKg) + " kg.",
+                    "Saved set " + savedSetNumber + ": " + load.displayValue() + ".",
                     toView(session)
             );
         }
@@ -170,7 +180,7 @@ public class WorkoutService {
             return new WeightEntryResult(
                     true,
                     false,
-                    "Saved set " + savedSetNumber + ": " + formatWeight(weightKg) + " kg. Next exercise:",
+                    "Saved set " + savedSetNumber + ": " + load.displayValue() + ". Next exercise:",
                     toView(session)
             );
         }
@@ -178,7 +188,7 @@ public class WorkoutService {
         session.setStatus(WorkoutSessionStatus.COMPLETED);
         session.setCompletedAt(LocalDateTime.now());
         workoutSessionRepository.save(session);
-        return new WeightEntryResult(true, true, "Saved set " + savedSetNumber + ": " + formatWeight(weightKg) + " kg. Training day completed.", null);
+        return new WeightEntryResult(true, true, "Saved set " + savedSetNumber + ": " + load.displayValue() + ". Training day completed.", null);
     }
 
     @Transactional
@@ -280,10 +290,10 @@ public class WorkoutService {
             }
 
             sessionLogs.sort(Comparator.comparing(WorkoutSetLog::getSetNumber));
-            List<Double> weights = sessionLogs.stream()
-                    .map(WorkoutSetLog::getWeightKg)
+            List<String> loads = sessionLogs.stream()
+                    .map(this::formatLoad)
                     .toList();
-            history.add(new WorkoutHistoryEntry(sessionLogs.getFirst().getWorkoutSession().getStartedAt(), weights));
+            history.add(new WorkoutHistoryEntry(sessionLogs.getFirst().getWorkoutSession().getStartedAt(), loads));
         }
         return history;
     }
@@ -327,21 +337,43 @@ public class WorkoutService {
         return exercise.getSets();
     }
 
-    private Optional<Double> parseWeight(String input) {
+    private Optional<SetLoad> parseSetLoad(String input) {
         if (input == null) {
             return Optional.empty();
         }
 
-        String normalized = input.trim().replace(',', '.');
-        if (!normalized.matches("\\d+(\\.\\d+)?")) {
+        String normalized = input.trim().replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
             return Optional.empty();
         }
 
-        double weight = Double.parseDouble(normalized);
-        if (weight <= 0) {
-            return Optional.empty();
+        if (NO_LOAD_INPUTS.contains(normalized.toLowerCase(Locale.ROOT))) {
+            return Optional.of(new SetLoad(null, null, "no load"));
         }
-        return Optional.of(weight);
+
+        Matcher matcher = WEIGHT_INPUT_PATTERN.matcher(normalized.replace(',', '.'));
+        if (matcher.matches()) {
+            double weight = Double.parseDouble(matcher.group(1));
+            if (weight < 0) {
+                return Optional.empty();
+            }
+            if (weight == 0) {
+                return Optional.of(new SetLoad(null, null, "no load"));
+            }
+            return Optional.of(new SetLoad(weight, null, formatWeight(weight) + " kg"));
+        }
+
+        return Optional.of(new SetLoad(null, normalized, normalized));
+    }
+
+    private String formatLoad(WorkoutSetLog setLog) {
+        if (setLog.getWeightKg() != null) {
+            return formatWeight(setLog.getWeightKg()) + " kg";
+        }
+        if (setLog.getLoadDescription() != null && !setLog.getLoadDescription().isBlank()) {
+            return setLog.getLoadDescription();
+        }
+        return "no load";
     }
 
     private boolean sameId(Long first, Long second) {

@@ -98,6 +98,7 @@ class WorkoutServiceTest {
         verify(workoutSetLogRepository).save(logCaptor.capture());
         assertThat(logCaptor.getValue().getSetNumber()).isEqualTo(1);
         assertThat(logCaptor.getValue().getWeightKg()).isEqualTo(60.5);
+        assertThat(logCaptor.getValue().getLoadDescription()).isNull();
         assertThat(exercise.getLastWeightKg()).isEqualTo(60.5);
         verify(exerciseRepository).save(exercise);
     }
@@ -123,11 +124,64 @@ class WorkoutServiceTest {
     }
 
     @Test
-    void recordWeightRejectsNonNumericInput() throws WorkoutException {
-        WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "heavy");
+    void recordTextLoadSavesDescriptionAndAdvancesToNextSet() throws Exception {
+        TrainingDay trainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise exercise = trainingDay.getExercises().getFirst();
+        WorkoutSession session = activeSession(user, trainingDay, exercise);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        when(workoutSetLogRepository.findByUserIdAndExerciseIdAndWorkoutSessionIdNotOrderByCreatedAtDesc(anyLong(), anyLong(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "red band");
+
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.message()).contains("Saved set 1: red band");
+        assertThat(result.exerciseView().currentSetNumber()).isEqualTo(2);
+
+        ArgumentCaptor<WorkoutSetLog> logCaptor = ArgumentCaptor.forClass(WorkoutSetLog.class);
+        verify(workoutSetLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getWeightKg()).isNull();
+        assertThat(logCaptor.getValue().getLoadDescription()).isEqualTo("red band");
+        assertThat(exercise.getLastWeightKg()).isNull();
+        verify(exerciseRepository, never()).save(any());
+    }
+
+    @Test
+    void recordNoLoadSavesEmptyLoadAndAdvancesToNextSet() throws Exception {
+        TrainingDay trainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise exercise = trainingDay.getExercises().getFirst();
+        WorkoutSession session = activeSession(user, trainingDay, exercise);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        when(workoutSetLogRepository.findByUserIdAndExerciseIdAndWorkoutSessionIdNotOrderByCreatedAtDesc(anyLong(), anyLong(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none");
+
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.message()).contains("Saved set 1: no load");
+        assertThat(result.exerciseView().currentSetNumber()).isEqualTo(2);
+
+        ArgumentCaptor<WorkoutSetLog> logCaptor = ArgumentCaptor.forClass(WorkoutSetLog.class);
+        verify(workoutSetLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getWeightKg()).isNull();
+        assertThat(logCaptor.getValue().getLoadDescription()).isNull();
+        verify(exerciseRepository, never()).save(any());
+    }
+
+    @Test
+    void recordWeightRejectsBlankInput() throws WorkoutException {
+        WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "   ");
 
         assertThat(result.accepted()).isFalse();
-        assertThat(result.message()).contains("Send weight in kg as a number");
+        assertThat(result.message()).contains("Send load for this set");
         verifyNoInteractions(userRepository, workoutSessionRepository, workoutSetLogRepository, exerciseRepository);
     }
 

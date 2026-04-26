@@ -169,7 +169,7 @@ class FitnessTelegramBotUnitTest {
                 List.of("https://video.example/bench"),
                 List.of(new WorkoutService.WorkoutHistoryEntry(
                         LocalDateTime.of(2026, 4, 25, 12, 0),
-                        List.of(55.0, 57.5, 60.0)
+                        List.of("55 kg", "57.5 kg", "60 kg")
                 ))
         );
 

@@ -46,6 +46,11 @@ telegram:
     username: zil_fit_bot
 
 openai:
-  api-key: ${OPENAI_API_KEY:}
-  base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
-  model: ${OPENAI_MODEL:gpt-4o-mini}
+  api-key: ${OPENAI_API_KEY:${NEBIUS_API_KEY:}}
+  base-url: ${OPENAI_BASE_URL:${NEBIUS_BASE_URL:https://api.openai.com/v1}}
+  model: ${OPENAI_MODEL:${NEBIUS_MODEL:gpt-4o-mini}}
+
+admin:
+  auth:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:change-me}

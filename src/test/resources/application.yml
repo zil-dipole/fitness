@@ -42,3 +42,8 @@ openai:
   api-key: test-key
   base-url: http://localhost
   model: gpt-4o-mini
+
+admin:
+  auth:
+    username: admin
+    password: test-password
