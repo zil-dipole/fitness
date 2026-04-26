@@ -388,7 +388,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private void handlePlainTextMessage(Update update) {
         Long userId = update.getMessage().getFrom().getId();
-        if (!workoutService.hasActiveWorkoutSession(userId)) {
+        if (!workoutService.hasWorkoutInputContext(userId)) {
             return;
         }
 

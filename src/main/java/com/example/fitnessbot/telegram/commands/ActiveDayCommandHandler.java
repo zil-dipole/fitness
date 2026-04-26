@@ -28,6 +28,7 @@ public class ActiveDayCommandHandler implements CommandHandler {
     public SendMessage handle(Update update) {
         Long telegramUserId = update.getMessage().getFrom().getId();
         TrainingDay activeTrainingDay = programService.getActiveTrainingDayForUser(telegramUserId);
+        int weekNumber = programService.getActiveProgramWeekForUser(telegramUserId);
 
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
@@ -36,7 +37,7 @@ public class ActiveDayCommandHandler implements CommandHandler {
             return response;
         }
 
-        response.setText("Active training day:\n\n" + TrainingDayMessageFormatter.format(activeTrainingDay));
+        response.setText("Active training day (Week " + weekNumber + "):\n\n" + TrainingDayMessageFormatter.format(activeTrainingDay));
         response.setParseMode("HTML");
         response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard());
         return response;

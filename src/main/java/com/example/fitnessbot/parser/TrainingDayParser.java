@@ -24,12 +24,13 @@ public class TrainingDayParser {
 
     private static final Logger log = LoggerFactory.getLogger(TrainingDayParser.class);
 
-    // Pattern to capture a bullet line. Captures the whole line after the bullet marker.
-    private static final Pattern BULLET_PATTERN = Pattern.compile("^[\\u2043\\-\\u2022\\u2023\\u25E6\\*\\+\\u2219\\u2014\\u2013]\\s*(.+)");
+    // Pattern to capture a list item. Supports bullets and numbered items like "1." or "2)".
+    private static final Pattern LIST_ITEM_PATTERN = Pattern.compile("^(?:[\\u2043\\-\\u2022\\u2023\\u25E6\\*\\+\\u2219\\u2014\\u2013]|\\d+[.)])\\s*(.+)");
     // Pattern for sets x reps like "3 x 6", "3x8-10", "4x6+", or "2xMAX".
     private static final Pattern SET_REP_PATTERN = Pattern.compile("(\\d+)\\s*[xхX]\\s*([\\p{L}\\d]+(?:-[\\p{L}\\d]+)?\\+?)");
     private static final Pattern TRAILING_PAREN_NOTE_PATTERN = Pattern.compile("\\s+(\\([^)]*\\))\\s*$");
     private static final Pattern TRAILING_REPS_ONLY_PATTERN = Pattern.compile("^(.*\\S)\\s+(AMRAP|MAX)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CIRCUIT_SECTION_PATTERN = Pattern.compile("(?i).*\\d+\\s*(?:rounds?|circles?|круг(?:а|ов)?).*");
     // Pattern for any URL
     private static final Pattern URL_PATTERN = Pattern.compile("https?://[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+", Pattern.CASE_INSENSITIVE);
 
@@ -62,9 +63,9 @@ public class TrainingDayParser {
                 continue;
             }
 
-            Matcher bulletMatcher = BULLET_PATTERN.matcher(line);
-            if (bulletMatcher.find()) {
-                String content = bulletMatcher.group(1).trim();
+            Matcher listItemMatcher = LIST_ITEM_PATTERN.matcher(line);
+            if (listItemMatcher.find()) {
+                String content = listItemMatcher.group(1).trim();
                 Exercise ex = new Exercise();
                 ex.setSection(currentSection);
                 ex.setPosition(position++);
@@ -116,6 +117,7 @@ public class TrainingDayParser {
                     }
                 }
 
+                applySectionInstructionIfNeeded(ex, currentSection);
                 exercises.add(ex);
             }
         }
@@ -147,5 +149,25 @@ public class TrainingDayParser {
             return;
         }
         exercise.setNotes(notes);
+    }
+
+    private void applySectionInstructionIfNeeded(Exercise exercise, String currentSection) {
+        if (currentSection == null || !CIRCUIT_SECTION_PATTERN.matcher(currentSection).matches()) {
+            return;
+        }
+
+        String instructionPrefix = currentSection.matches(".*[А-Яа-яЁё].*")
+                ? "Круги: "
+                : "Circuit: ";
+        String instruction = instructionPrefix + currentSection;
+
+        if (exercise.getNotes() == null || exercise.getNotes().isBlank()) {
+            exercise.setNotes(instruction);
+            return;
+        }
+
+        if (!exercise.getNotes().contains(instruction)) {
+            exercise.setNotes(instruction + "; " + exercise.getNotes());
+        }
     }
 }

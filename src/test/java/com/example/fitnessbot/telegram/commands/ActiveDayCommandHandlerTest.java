@@ -55,21 +55,25 @@ class ActiveDayCommandHandlerTest {
         Update update = createUpdate();
         TrainingDay trainingDay = new TrainingDay();
         trainingDay.setTitle("Upper <Body> & Arms");
+        trainingDay.setRawText("Upper <Body> & Arms\nBench & Row > Press\nKeep elbows < shoulders & controlled");
         Exercise exercise = new Exercise();
         exercise.setName("Bench & Row > Press");
         exercise.setNotes("Keep elbows < shoulders & controlled");
         trainingDay.setExercises(List.of(exercise));
 
         when(programService.getActiveTrainingDayForUser(TEST_TELEGRAM_ID)).thenReturn(trainingDay);
+        when(programService.getActiveProgramWeekForUser(TEST_TELEGRAM_ID)).thenReturn(3);
 
         SendMessage response = handler.handle(update);
 
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getParseMode()).isEqualTo("HTML");
-        assertThat(response.getText()).contains("Active training day:");
+        assertThat(response.getText()).contains("Active training day (Week 3):");
+        assertThat(response.getText()).contains("<blockquote>Upper &lt;Body&gt; &amp; Arms\nBench &amp; Row &gt; Press\nKeep elbows &lt; shoulders &amp; controlled</blockquote>");
         assertThat(response.getText()).contains("<b>Upper &lt;Body&gt; &amp; Arms</b>");
         assertThat(response.getText()).contains("Bench &amp; Row &gt; Press");
         assertThat(response.getText()).contains("Keep elbows &lt; shoulders &amp; controlled");
+        assertThat(response.getText().indexOf("<blockquote>")).isLessThan(response.getText().indexOf("Exercises:"));
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
@@ -83,9 +87,11 @@ class ActiveDayCommandHandlerTest {
         trainingDay.setExercises(List.of(exercise));
 
         when(programService.getActiveTrainingDayForUser(TEST_TELEGRAM_ID)).thenReturn(trainingDay);
+        when(programService.getActiveProgramWeekForUser(TEST_TELEGRAM_ID)).thenReturn(2);
 
         SendMessage response = handler.handle(update);
 
+        assertThat(response.getText()).contains("Week 2");
         assertThat(response.getText()).contains("Lower Body");
         assertThat(response.getText()).contains("Squat");
     }

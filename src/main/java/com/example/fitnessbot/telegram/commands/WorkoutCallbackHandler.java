@@ -96,14 +96,22 @@ public class WorkoutCallbackHandler implements CallbackQueryHandler {
     }
 
     private void appendNextTrainingDay(SendMessage response, Long telegramUserId, String completionMessage) {
-        TrainingDay nextTrainingDay = programService.advanceActiveTrainingDayForUser(telegramUserId);
-        if (nextTrainingDay == null) {
+        ProgramService.ActiveTrainingDayProgression progression = programService.advanceActiveTrainingDayForUser(telegramUserId);
+        if (progression == null || progression.trainingDay() == null) {
             response.setText(completionMessage);
             return;
         }
 
-        response.setText(completionMessage + "\n\nNext active training day:\n\n"
-                + TrainingDayMessageFormatter.format(nextTrainingDay));
+        StringBuilder text = new StringBuilder(completionMessage)
+                .append("\n\nNext active training day (Week ")
+                .append(progression.weekNumber())
+                .append("):\n\n")
+                .append(TrainingDayMessageFormatter.format(progression.trainingDay()));
+        if (progression.completedFiveWeeks()) {
+            text.append("\nYou completed 5 weeks of this program.");
+        }
+
+        response.setText(text.toString());
         response.setParseMode("HTML");
         response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard());
     }

@@ -63,8 +63,10 @@ public class OpenAiTrainingDayParser {
             15. Exercises may be written with bullets like "-", "*", "•", "—", "–", "+", "∙", or with numbering.
             16. If a line contains both exercise data and URLs, extract the URLs and still parse the exercise.
             17. If something is ambiguous, prefer a conservative parse: keep uncertain text in `notes`, and use null instead of guessing numeric fields.
-            18. Do not invent exercises or fields.
-            19. Return valid JSON only.
+            18. Numbered list items like `1.` or `2)` can be exercises and should be parsed just like bullet items.
+            19. If a section/header indicates rounds or circuits, such as `3 rounds`, `3 circles`, or `3 круга`, keep that section and also carry the round-by-round instruction into each exercise's `notes` when useful.
+            20. Do not invent exercises or fields.
+            21. Return valid JSON only.
             """;
 
     private final RestClient restClient;

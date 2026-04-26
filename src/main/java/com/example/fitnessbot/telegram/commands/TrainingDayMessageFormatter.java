@@ -10,15 +10,14 @@ final class TrainingDayMessageFormatter {
 
     static String format(TrainingDay trainingDay) {
         StringBuilder response = new StringBuilder();
-        response.append("<b>").append(escapeHtml(trainingDay.getTitle())).append("</b>\n\n");
 
-        if (trainingDay.getRawText() != null) {
-            String[] lines = trainingDay.getRawText().split("\\r?\\n");
-            for (int i = 1; i < lines.length; i++) {
-                response.append(escapeHtml(lines[i])).append("\n");
-            }
-            response.append("\n");
+        if (trainingDay.getRawText() != null && !trainingDay.getRawText().isBlank()) {
+            response.append("<blockquote>")
+                    .append(escapeHtml(trainingDay.getRawText().strip()))
+                    .append("</blockquote>\n\n");
         }
+
+        response.append("<b>").append(escapeHtml(trainingDay.getTitle())).append("</b>\n\n");
 
         if (trainingDay.getExercises() != null && !trainingDay.getExercises().isEmpty()) {
             response.append("Exercises:\n");

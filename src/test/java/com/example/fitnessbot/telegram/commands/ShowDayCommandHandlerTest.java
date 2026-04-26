@@ -92,6 +92,7 @@ class ShowDayCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("<blockquote>Upper Body\nUpper body workout focusing on chest &amp; shoulders");
         assertThat(response.getText()).contains("<b>Upper &lt;Body&gt; &amp; Arms</b>");
         assertThat(response.getText()).contains("Upper body workout focusing on chest &amp; shoulders");
         assertThat(response.getText()).contains("1. Bench &amp; Press &gt; Row");

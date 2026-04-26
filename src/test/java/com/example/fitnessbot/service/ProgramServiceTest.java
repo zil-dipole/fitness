@@ -205,11 +205,16 @@ class ProgramServiceTest {
 
         when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
         when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(10L)).thenReturn(List.of(firstLink, secondLink));
+        when(trainingDayRepository.findByIdWithExercises(101L)).thenReturn(Optional.of(secondDay));
 
-        TrainingDay result = programService.advanceActiveTrainingDayForUser(telegramUserId);
+        ProgramService.ActiveTrainingDayProgression result = programService.advanceActiveTrainingDayForUser(telegramUserId);
 
-        assertThat(result).isEqualTo(secondDay);
+        assertThat(result.trainingDay()).isEqualTo(secondDay);
+        assertThat(result.weekNumber()).isEqualTo(1);
+        assertThat(result.wrappedToFirstDay()).isFalse();
+        assertThat(result.completedFiveWeeks()).isFalse();
         assertThat(user.getActiveTrainingDay()).isEqualTo(secondDay);
+        assertThat(user.getActiveProgramWeek()).isEqualTo(1);
         verify(userRepository).save(user);
     }
 
@@ -244,12 +249,58 @@ class ProgramServiceTest {
 
         when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
         when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(10L)).thenReturn(List.of(firstLink, secondLink));
+        when(trainingDayRepository.findByIdWithExercises(100L)).thenReturn(Optional.of(firstDay));
 
-        TrainingDay result = programService.advanceActiveTrainingDayForUser(telegramUserId);
+        user.setActiveProgramWeek(1);
+        ProgramService.ActiveTrainingDayProgression result = programService.advanceActiveTrainingDayForUser(telegramUserId);
 
-        assertThat(result).isEqualTo(firstDay);
+        assertThat(result.trainingDay()).isEqualTo(firstDay);
+        assertThat(result.weekNumber()).isEqualTo(2);
+        assertThat(result.wrappedToFirstDay()).isTrue();
+        assertThat(result.completedFiveWeeks()).isFalse();
         assertThat(user.getActiveTrainingDay()).isEqualTo(firstDay);
+        assertThat(user.getActiveProgramWeek()).isEqualTo(2);
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void testAdvanceActiveTrainingDayForUserMarksFiveWeekCompletion() {
+        Long telegramUserId = 123L;
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(telegramUserId);
+        user.setActiveProgramWeek(5);
+
+        Program program = new Program();
+        program.setId(10L);
+        user.setActiveProgram(program);
+
+        TrainingDay firstDay = new TrainingDay();
+        firstDay.setId(100L);
+        TrainingDay secondDay = new TrainingDay();
+        secondDay.setId(101L);
+        user.setActiveTrainingDay(secondDay);
+
+        ProgramTrainingDay firstLink = new ProgramTrainingDay();
+        firstLink.setProgram(program);
+        firstLink.setTrainingDay(firstDay);
+        firstLink.setPosition(1);
+        ProgramTrainingDay secondLink = new ProgramTrainingDay();
+        secondLink.setProgram(program);
+        secondLink.setTrainingDay(secondDay);
+        secondLink.setPosition(2);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(10L)).thenReturn(List.of(firstLink, secondLink));
+        when(trainingDayRepository.findByIdWithExercises(100L)).thenReturn(Optional.of(firstDay));
+
+        ProgramService.ActiveTrainingDayProgression result = programService.advanceActiveTrainingDayForUser(telegramUserId);
+
+        assertThat(result.weekNumber()).isEqualTo(6);
+        assertThat(result.wrappedToFirstDay()).isTrue();
+        assertThat(result.completedFiveWeeks()).isTrue();
+        assertThat(user.getActiveProgramWeek()).isEqualTo(6);
     }
 
     @Test
@@ -639,13 +690,16 @@ class ProgramServiceTest {
         when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
         when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.of(program));
         when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(programId)).thenReturn(List.of(programTrainingDay));
+        when(trainingDayRepository.findByIdWithExercises(10L)).thenReturn(Optional.of(trainingDay));
 
         ProgramService.ActiveProgramSelection result = programService.startProgramForUser(programId, telegramUserId);
 
         assertThat(result.program()).isEqualTo(program);
         assertThat(result.trainingDay()).isEqualTo(trainingDay);
+        assertThat(result.weekNumber()).isEqualTo(1);
         assertThat(user.getActiveProgram()).isEqualTo(program);
         assertThat(user.getActiveTrainingDay()).isEqualTo(trainingDay);
+        assertThat(user.getActiveProgramWeek()).isEqualTo(1);
         verify(userRepository).save(user);
     }
 
@@ -736,6 +790,7 @@ class ProgramServiceTest {
         user.setActiveTrainingDay(trainingDay);
 
         when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(trainingDayRepository.findByIdWithExercises(10L)).thenReturn(Optional.of(trainingDay));
 
         TrainingDay result = programService.getActiveTrainingDayForUser(telegramUserId);
 

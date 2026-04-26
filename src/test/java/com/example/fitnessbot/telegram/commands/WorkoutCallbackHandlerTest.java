@@ -72,6 +72,19 @@ class WorkoutCallbackHandlerTest {
     }
 
     @Test
+    void startActiveDayShowsPreviousCustomLoadButton() throws Exception {
+        when(workoutService.startActiveTrainingDay(TELEGRAM_USER_ID))
+                .thenReturn(exerciseView(null, "orange band"));
+
+        SendMessage response = handler.handle(update(WorkoutMessageFormatter.START_ACTIVE_DAY_CALLBACK));
+
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
+        assertThat(markup.getKeyboard().getFirst().getFirst().getText()).isEqualTo("Use orange band");
+        assertThat(markup.getKeyboard().getFirst().getFirst().getCallbackData()).isEqualTo(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK);
+    }
+
+    @Test
     void noLoadButtonRecordsCurrentSetAsNoLoad() throws Exception {
         when(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"))
                 .thenReturn(new WorkoutService.WeightEntryResult(true, false, "Saved set 1: no load.", exerciseView()));
@@ -105,13 +118,13 @@ class WorkoutCallbackHandlerTest {
                 .thenReturn(new WorkoutService.WeightEntryResult(
                         false,
                         false,
-                        "No previous weight is available for this exercise.",
+                        "No previous load is available for this exercise.",
                         null
                 ));
 
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK));
 
-        assertThat(response.getText()).isEqualTo("No previous weight is available for this exercise.");
+        assertThat(response.getText()).isEqualTo("No previous load is available for this exercise.");
         assertThat(response.getParseMode()).isNull();
         assertThat(response.getReplyMarkup()).isNull();
     }
@@ -119,13 +132,13 @@ class WorkoutCallbackHandlerTest {
     @Test
     void finishWorkoutShowsCompletionMessage() {
         when(workoutService.finishActiveWorkout(TELEGRAM_USER_ID)).thenReturn(true);
-        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDay());
+        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDayProgression(2, false, false));
 
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.FINISH_WORKOUT_CALLBACK));
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
         assertThat(response.getText()).contains("Training day finished.");
-        assertThat(response.getText()).contains("Next active training day:");
+        assertThat(response.getText()).contains("Next active training day (Week 2):");
         assertThat(response.getText()).contains("Lower Body");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
@@ -134,18 +147,34 @@ class WorkoutCallbackHandlerTest {
     void completedWorkoutResultShowsNextTrainingDay() throws Exception {
         when(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"))
                 .thenReturn(new WorkoutService.WeightEntryResult(true, true, "Saved set 3: Grey green band. Training day completed.", null));
-        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDay());
+        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDayProgression(2, false, false));
 
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
         assertThat(response.getText()).contains("Saved set 3: Grey green band. Training day completed.");
-        assertThat(response.getText()).contains("Next active training day:");
+        assertThat(response.getText()).contains("Next active training day (Week 2):");
         assertThat(response.getText()).contains("Lower Body");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
+    @Test
+    void completedWorkoutResultShowsFiveWeekMessageAfterWrap() throws Exception {
+        when(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"))
+                .thenReturn(new WorkoutService.WeightEntryResult(true, true, "Saved set 3: Grey green band. Training day completed.", null));
+        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDayProgression(6, true, true));
+
+        SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
+
+        assertThat(response.getText()).contains("Next active training day (Week 6):");
+        assertThat(response.getText()).contains("You completed 5 weeks of this program.");
+    }
+
     private WorkoutService.WorkoutExerciseView exerciseView() {
+        return exerciseView(55.0, "55 kg");
+    }
+
+    private WorkoutService.WorkoutExerciseView exerciseView(Double previousWeightKg, String previousLoad) {
         return new WorkoutService.WorkoutExerciseView(
                 100L,
                 "Upper Body",
@@ -154,10 +183,12 @@ class WorkoutCallbackHandlerTest {
                 2,
                 1,
                 3,
+                false,
                 "8",
                 "Warm up first",
                 List.of("https://video.example/bench"),
-                55.0,
+                previousWeightKg,
+                previousLoad,
                 List.of(new WorkoutService.WorkoutHistoryEntry(
                         LocalDateTime.of(2026, 4, 25, 12, 0),
                         List.of("55 kg", "red band", "no load")
@@ -165,13 +196,13 @@ class WorkoutCallbackHandlerTest {
         );
     }
 
-    private TrainingDay nextTrainingDay() {
+    private ProgramService.ActiveTrainingDayProgression nextTrainingDayProgression(int weekNumber, boolean wrappedToFirstDay, boolean completedFiveWeeks) {
         TrainingDay trainingDay = new TrainingDay();
         trainingDay.setTitle("Lower Body");
         Exercise exercise = new Exercise();
         exercise.setName("Squat");
         trainingDay.setExercises(List.of(exercise));
-        return trainingDay;
+        return new ProgramService.ActiveTrainingDayProgression(trainingDay, weekNumber, wrappedToFirstDay, completedFiveWeeks);
     }
 
     private Update update(String data) {

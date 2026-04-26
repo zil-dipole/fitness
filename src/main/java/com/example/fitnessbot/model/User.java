@@ -37,6 +37,9 @@ public class User {
     @JoinColumn(name = "active_training_day_id")
     private TrainingDay activeTrainingDay;
 
+    @Column(name = "active_program_week", nullable = false)
+    private Integer activeProgramWeek = 1;
+
     public Long getId() {
         return id;
     }
@@ -123,5 +126,13 @@ public class User {
 
     public void setActiveTrainingDay(TrainingDay activeTrainingDay) {
         this.activeTrainingDay = activeTrainingDay;
+    }
+
+    public Integer getActiveProgramWeek() {
+        return activeProgramWeek;
+    }
+
+    public void setActiveProgramWeek(Integer activeProgramWeek) {
+        this.activeProgramWeek = activeProgramWeek;
     }
 }

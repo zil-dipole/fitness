@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-add-user-active-program-week
+      author: developer
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: active_program_week
+                  type: integer
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false

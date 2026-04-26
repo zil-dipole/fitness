@@ -40,7 +40,9 @@ public final class WorkoutMessageFormatter {
                 .append(": <b>")
                 .append(TrainingDayMessageFormatter.escapeHtml(view.exerciseName()))
                 .append("</b>\n");
-        response.append("Set ").append(view.currentSetNumber()).append("/").append(view.totalSets()).append("\n");
+        String stepLabel = view.circuit() ? "Round" : "Set";
+        String promptLabel = view.circuit() ? "round" : "set";
+        response.append(stepLabel).append(" ").append(view.currentSetNumber()).append("/").append(view.totalSets()).append("\n");
 
         if (view.repsOrDuration() != null && !view.repsOrDuration().isBlank()) {
             response.append("Reps/Duration: ")
@@ -65,7 +67,9 @@ public final class WorkoutMessageFormatter {
 
         response.append("\n");
         appendHistory(response, view.history());
-        response.append("\nSend load for set ")
+        response.append("\nSend load for ")
+                .append(promptLabel)
+                .append(" ")
                 .append(view.currentSetNumber())
                 .append(". Examples: 60, red band, bodyweight. Send none for no load.");
 
@@ -89,9 +93,10 @@ public final class WorkoutMessageFormatter {
     public static InlineKeyboardMarkup exerciseKeyboard(WorkoutService.WorkoutExerciseView view) {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        if (view != null && view.previousWeightKg() != null && view.previousWeightKg() > 0) {
+        String previousLoad = previousLoadForButton(view);
+        if (previousLoad != null) {
             InlineKeyboardButton previousWeightButton = new InlineKeyboardButton();
-            previousWeightButton.setText("Use " + formatWeight(view.previousWeightKg()) + " kg");
+            previousWeightButton.setText("Use " + previousLoad);
             previousWeightButton.setCallbackData(PREVIOUS_WEIGHT_CALLBACK);
             rows.add(List.of(previousWeightButton));
         }
@@ -139,6 +144,26 @@ public final class WorkoutMessageFormatter {
             return "no load";
         }
         return TrainingDayMessageFormatter.escapeHtml(load);
+    }
+
+    private static String previousLoadForButton(WorkoutService.WorkoutExerciseView view) {
+        if (view == null) {
+            return null;
+        }
+        if (view.previousLoad() != null && !view.previousLoad().isBlank()) {
+            return truncateButtonValue(view.previousLoad().trim());
+        }
+        if (view.previousWeightKg() != null && view.previousWeightKg() > 0) {
+            return formatWeight(view.previousWeightKg()) + " kg";
+        }
+        return null;
+    }
+
+    private static String truncateButtonValue(String value) {
+        if (value.length() <= 48) {
+            return value;
+        }
+        return value.substring(0, 45) + "...";
     }
 
     private static String formatWeight(double weight) {

@@ -411,4 +411,28 @@ class TrainingDayParserTest {
         assertThat(ex1.getVideoUrls()).hasSize(1);
         assertThat(ex1.getVideoUrls().get(0)).isEqualTo(longUrl);
     }
+
+    @Test
+    void testParseRoundBlockWithNumberedExercises() {
+        String rawText = """
+                Base:
+                 ⁃ Snap down to vert jump 3 x 4 https://youtube.com/shorts/uw1nQk1tC0A?si=NeXLkf8OIda-m3BE
+
+                ISO 3 круга:
+                 1. Copenhagen x 20 sec https://youtu.be/tKb76R21AfM?si=K0cxuApwdAHxMtN4
+                 2. Side plank hold x 20 sec https://www.youtube.com/watch?v=q1o3RwFqVmQ&pp=ygUdc2lkZSBwbGFuayBpc28gaG9sZCBhYmR1Y3Rpb24%3D
+                 3. Hamstring SL plank x 20 sec https://youtube.com/shorts/Fd3sFl9Hw4Y?si=MTM_1Tsj69r6qNZF
+                 4. Spanish squat x 45 sec https://youtube.com/shorts/U59m3dsN1AE?si=JI3WJPA47AO9ZTEL
+                """;
+
+        TrainingDay day = parser.parse(rawText);
+
+        assertThat(day.getExercises()).hasSize(5);
+        assertThat(day.getExercises().get(1).getSection()).isEqualTo("ISO 3 круга");
+        assertThat(day.getExercises().get(1).getName()).isEqualTo("Copenhagen x 20 sec");
+        assertThat(day.getExercises().get(1).getVideoUrls()).containsExactly("https://youtu.be/tKb76R21AfM?si=K0cxuApwdAHxMtN4");
+        assertThat(day.getExercises().get(1).getNotes()).isEqualTo("Круги: ISO 3 круга");
+        assertThat(day.getExercises().get(4).getName()).isEqualTo("Spanish squat x 45 sec");
+        assertThat(day.getExercises().get(4).getNotes()).isEqualTo("Круги: ISO 3 круга");
+    }
 }

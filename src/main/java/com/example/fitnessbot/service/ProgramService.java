@@ -17,7 +17,15 @@ import java.util.Optional;
 @Service
 public class ProgramService {
 
-    public record ActiveProgramSelection(Program program, TrainingDay trainingDay) {
+    public record ActiveProgramSelection(Program program, TrainingDay trainingDay, int weekNumber) {
+    }
+
+    public record ActiveTrainingDayProgression(
+            TrainingDay trainingDay,
+            int weekNumber,
+            boolean wrappedToFirstDay,
+            boolean completedFiveWeeks
+    ) {
     }
 
     private final ProgramRepository programRepository;
@@ -144,9 +152,10 @@ public class ProgramService {
         TrainingDay firstTrainingDay = trainingDays.getFirst().getTrainingDay();
         user.setActiveProgram(program);
         user.setActiveTrainingDay(firstTrainingDay);
+        user.setActiveProgramWeek(1);
         userRepository.save(user);
 
-        return new ActiveProgramSelection(program, firstTrainingDay);
+        return new ActiveProgramSelection(program, loadTrainingDayWithExercises(firstTrainingDay), 1);
     }
 
     @Transactional
@@ -166,6 +175,7 @@ public class ProgramService {
         if (user.getActiveProgram() != null && programId.equals(user.getActiveProgram().getId())) {
             user.setActiveProgram(null);
             user.setActiveTrainingDay(null);
+            user.setActiveProgramWeek(1);
             userRepository.save(user);
         }
 
@@ -182,8 +192,16 @@ public class ProgramService {
                 .orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public int getActiveProgramWeekForUser(Long telegramUserId) {
+        return userRepository.findByTelegramId(telegramUserId)
+                .map(User::getActiveProgramWeek)
+                .filter(week -> week != null && week > 0)
+                .orElse(1);
+    }
+
     @Transactional
-    public TrainingDay advanceActiveTrainingDayForUser(Long telegramUserId) {
+    public ActiveTrainingDayProgression advanceActiveTrainingDayForUser(Long telegramUserId) {
         Optional<User> optionalUser = userRepository.findByTelegramId(telegramUserId);
         if (optionalUser.isEmpty()) {
             return null;
@@ -192,12 +210,30 @@ public class ProgramService {
         User user = optionalUser.get();
         Program activeProgram = user.getActiveProgram();
         if (activeProgram == null) {
-            return user.getActiveTrainingDay();
+            TrainingDay activeTrainingDay = user.getActiveTrainingDay();
+            if (activeTrainingDay == null) {
+                return null;
+            }
+            return new ActiveTrainingDayProgression(
+                    loadTrainingDayWithExercises(activeTrainingDay),
+                    normalizedWeek(user),
+                    false,
+                    false
+            );
         }
 
         List<ProgramTrainingDay> trainingDays = programTrainingDayRepository.findByProgramIdOrderByPositionAsc(activeProgram.getId());
         if (trainingDays.isEmpty()) {
-            return user.getActiveTrainingDay();
+            TrainingDay activeTrainingDay = user.getActiveTrainingDay();
+            if (activeTrainingDay == null) {
+                return null;
+            }
+            return new ActiveTrainingDayProgression(
+                    loadTrainingDayWithExercises(activeTrainingDay),
+                    normalizedWeek(user),
+                    false,
+                    false
+            );
         }
 
         TrainingDay currentTrainingDay = user.getActiveTrainingDay();
@@ -213,10 +249,19 @@ public class ProgramService {
         }
 
         int nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % trainingDays.size();
+        boolean wrappedToFirstDay = currentIndex >= 0 && nextIndex == 0;
+        int currentWeek = normalizedWeek(user);
+        int nextWeek = wrappedToFirstDay ? currentWeek + 1 : currentWeek;
         TrainingDay nextTrainingDay = trainingDays.get(nextIndex).getTrainingDay();
         user.setActiveTrainingDay(nextTrainingDay);
+        user.setActiveProgramWeek(nextWeek);
         userRepository.save(user);
-        return loadTrainingDayWithExercises(nextTrainingDay);
+        return new ActiveTrainingDayProgression(
+                loadTrainingDayWithExercises(nextTrainingDay),
+                nextWeek,
+                wrappedToFirstDay,
+                wrappedToFirstDay && nextWeek == 6
+        );
     }
 
     private TrainingDay loadTrainingDayWithExercises(TrainingDay trainingDay) {
@@ -228,6 +273,11 @@ public class ProgramService {
             loadedTrainingDay.getExercises().forEach(exercise -> Hibernate.initialize(exercise.getVideoUrls()));
         }
         return loadedTrainingDay;
+    }
+
+    private int normalizedWeek(User user) {
+        Integer week = user.getActiveProgramWeek();
+        return week == null || week < 1 ? 1 : week;
     }
 
     /**

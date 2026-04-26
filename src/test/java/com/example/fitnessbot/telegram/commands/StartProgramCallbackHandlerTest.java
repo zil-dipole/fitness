@@ -50,13 +50,13 @@ class StartProgramCallbackHandlerTest {
         trainingDay.setTitle("Upper Body");
 
         when(programService.startProgramForUser(1L, TEST_TELEGRAM_ID))
-                .thenReturn(new ProgramService.ActiveProgramSelection(program, trainingDay));
+                .thenReturn(new ProgramService.ActiveProgramSelection(program, trainingDay, 1));
 
         SendMessage response = handler.handle(update);
 
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("Started program \"Strength\"");
-        assertThat(response.getText()).contains("Active training day: Upper Body");
+        assertThat(response.getText()).contains("Week 1, active training day: Upper Body");
         assertThat(response.getText()).contains("/active_day");
     }
 

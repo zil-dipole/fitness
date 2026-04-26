@@ -17,6 +17,7 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -164,29 +165,36 @@ class FitnessTelegramBotUnitTest {
                 2,
                 2,
                 3,
+                false,
                 "8",
                 "Warm up first",
                 List.of("https://video.example/bench"),
                 60.0,
+                "60 kg",
                 List.of(new WorkoutService.WorkoutHistoryEntry(
                         LocalDateTime.of(2026, 4, 25, 12, 0),
                         List.of("55 kg", "57.5 kg", "60 kg")
                 ))
         );
 
-        when(workoutService.hasActiveWorkoutSession(USER_ID)).thenReturn(true);
+        when(workoutService.hasWorkoutInputContext(USER_ID)).thenReturn(true);
         when(workoutService.recordWeightForCurrentSet(USER_ID, "60"))
                 .thenReturn(new WorkoutService.WeightEntryResult(true, false, "Saved set 1: 60 kg.", view));
         doNothing().when(fitnessTelegramBot).sendTelegramMessage(any(SendMessage.class));
 
         fitnessTelegramBot.onUpdateReceived(update);
 
-        verify(fitnessTelegramBot).sendTelegramMessage(argThat(message ->
-                "HTML".equals(message.getParseMode())
-                        && message.getText().contains("Saved set 1: 60 kg.")
-                        && message.getText().contains("Exercise 1/2")
-                        && message.getReplyMarkup() instanceof InlineKeyboardMarkup
-        ));
+        verify(fitnessTelegramBot).sendTelegramMessage(argThat(message -> {
+            if (!(message.getReplyMarkup() instanceof InlineKeyboardMarkup markup)) {
+                return false;
+            }
+            InlineKeyboardButton firstButton = markup.getKeyboard().getFirst().getFirst();
+            return "HTML".equals(message.getParseMode())
+                    && message.getText().contains("Saved set 1: 60 kg.")
+                    && message.getText().contains("Exercise 1/2")
+                    && "Use 60 kg".equals(firstButton.getText())
+                    && WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK.equals(firstButton.getCallbackData());
+        }));
     }
 
     private Update createMockUpdateWithCommand(String command) {

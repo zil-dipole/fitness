@@ -21,3 +21,5 @@ databaseChangeLog:
       file: db/changelog/011-allow-workout-set-load-description.yaml
   - include:
       file: db/changelog/012-add-exercise-canonical-link.yaml
+  - include:
+      file: db/changelog/013-add-user-active-program-week.yaml
