@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class WorkoutMessageFormatter {
 
@@ -19,59 +21,62 @@ public final class WorkoutMessageFormatter {
     public static final String SKIP_EXERCISE_CALLBACK = "skip_workout_exercise";
     public static final String FINISH_WORKOUT_CALLBACK = "finish_workout";
 
-    private static final DateTimeFormatter HISTORY_DATE_FORMAT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
+    private static final DateTimeFormatter HISTORY_DATE_FORMAT = DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH);
+    private static final Pattern SAVED_LOAD_PATTERN = Pattern.compile(
+            "Saved (set|round) (\\d+): (.*?)(?:\\.\\s+(?:Next|Training)|\\.$|$).*",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private WorkoutMessageFormatter() {
     }
 
     public static String formatExerciseResult(String message, WorkoutService.WorkoutExerciseView view) {
-        return TrainingDayMessageFormatter.escapeHtml(message) + "\n\n" + formatExerciseView(view);
+        return formatResultMessage(message) + "\n" + formatExerciseView(view);
     }
 
     public static String formatExerciseView(WorkoutService.WorkoutExerciseView view) {
         StringBuilder response = new StringBuilder();
-        response.append("<b>")
-                .append(TrainingDayMessageFormatter.escapeHtml(view.trainingDayTitle()))
-                .append("</b>\n\n");
-        response.append("Exercise ")
-                .append(view.exerciseNumber())
-                .append("/")
-                .append(view.totalExercises())
-                .append(": <b>")
-                .append(TrainingDayMessageFormatter.escapeHtml(view.exerciseName()))
-                .append("</b>\n");
         String stepLabel = view.circuit() ? "Round" : "Set";
         String promptLabel = view.circuit() ? "round" : "set";
-        response.append(stepLabel).append(" ").append(view.currentSetNumber()).append("/").append(view.totalSets()).append("\n");
-
-        if (view.repsOrDuration() != null && !view.repsOrDuration().isBlank()) {
-            response.append("Reps/Duration: ")
-                    .append(TrainingDayMessageFormatter.escapeHtml(view.repsOrDuration()))
-                    .append("\n");
+        String note = cleanText(view.notes());
+        String target = formatRepsOrDuration(view.repsOrDuration());
+        if (note != null && note.toLowerCase(Locale.ROOT).startsWith("rpe")) {
+            target = target + " @ " + TrainingDayMessageFormatter.escapeHtml(note);
+            note = null;
         }
 
-        if (view.notes() != null && !view.notes().isBlank()) {
-            response.append("Prep/Notes: ")
-                    .append(TrainingDayMessageFormatter.escapeHtml(view.notes()))
+        response.append("🔥 <b>")
+                .append(TrainingDayMessageFormatter.escapeHtml(view.exerciseName()))
+                .append("</b>")
+                .append("\n");
+        response.append(stepLabel)
+                .append(" ")
+                .append(view.currentSetNumber())
+                .append("/")
+                .append(view.totalSets())
+                .append(" → <b>")
+                .append(target)
+                .append("</b>")
+                .append("\n");
+        if (note != null) {
+            response.append("• ")
+                    .append(TrainingDayMessageFormatter.escapeHtml(note))
                     .append("\n");
         }
 
         if (!view.videoUrls().isEmpty()) {
-            response.append("Videos:\n");
-            for (String videoUrl : view.videoUrls()) {
-                response.append("- ")
-                        .append(TrainingDayMessageFormatter.escapeHtml(videoUrl))
-                        .append("\n");
-            }
+            response.append("🎥 ")
+                    .append(TrainingDayMessageFormatter.escapeHtml(view.videoUrls().getFirst()))
+                    .append("\n");
         }
 
-        response.append("\n");
         appendHistory(response, view.history());
-        response.append("\nSend load for ")
+        response.append("👉 <b>Load for ")
                 .append(promptLabel)
                 .append(" ")
                 .append(view.currentSetNumber())
-                .append(". Examples: 60, red band, bodyweight. Send none for no load.");
+                .append(":</b> ")
+                .append("60 · red band · bodyweight · none");
 
         return response.toString();
     }
@@ -102,7 +107,7 @@ public final class WorkoutMessageFormatter {
         }
 
         InlineKeyboardButton noLoadButton = new InlineKeyboardButton();
-        noLoadButton.setText("No Load");
+        noLoadButton.setText("No load");
         noLoadButton.setCallbackData(NO_LOAD_CALLBACK);
 
         InlineKeyboardButton skipButton = new InlineKeyboardButton();
@@ -122,21 +127,59 @@ public final class WorkoutMessageFormatter {
 
     private static void appendHistory(StringBuilder response, List<WorkoutService.WorkoutHistoryEntry> history) {
         if (history.isEmpty()) {
-            response.append("Previous loads: none yet.\n");
             return;
         }
 
-        response.append("Previous loads:\n");
-        for (WorkoutService.WorkoutHistoryEntry entry : history) {
-            String loads = entry.loads().stream()
-                    .map(WorkoutMessageFormatter::formatLoad)
-                    .collect(Collectors.joining(" / "));
-            response.append("- ")
-                    .append(entry.startedAt().format(HISTORY_DATE_FORMAT))
-                    .append(": ")
-                    .append(loads)
-                    .append("\n");
+        WorkoutService.WorkoutHistoryEntry entry = history.getFirst();
+        String loads = entry.loads().stream()
+                .map(WorkoutMessageFormatter::formatLoad)
+                .collect(Collectors.joining(" / "));
+        response.append("Last ")
+                .append(entry.startedAt().format(HISTORY_DATE_FORMAT))
+                .append(": ")
+                .append(loads)
+                .append("\n");
+    }
+
+    private static String formatResultMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "✅ Saved";
         }
+
+        Matcher matcher = SAVED_LOAD_PATTERN.matcher(message.trim());
+        if (matcher.matches()) {
+            String stepLabel = matcher.group(1).toLowerCase(Locale.ROOT);
+            String stepNumber = matcher.group(2);
+            String load = matcher.group(3).trim();
+            return "✅ <b>" + TrainingDayMessageFormatter.escapeHtml(load) + " saved</b> · " + stepLabel + " " + stepNumber;
+        }
+
+        if (message.toLowerCase(Locale.ROOT).startsWith("skipped")) {
+            return "⏭ <b>Skipped</b>";
+        }
+
+        return TrainingDayMessageFormatter.escapeHtml(message);
+    }
+
+    private static String formatRepsOrDuration(String repsOrDuration) {
+        String value = cleanText(repsOrDuration);
+        if (value == null) {
+            return "do prescribed work";
+        }
+
+        if (value.matches("\\d+(?:[.,]\\d+)?")) {
+            return TrainingDayMessageFormatter.escapeHtml(value) + " reps";
+        }
+
+        return TrainingDayMessageFormatter.escapeHtml(value);
+    }
+
+    private static String cleanText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim().replaceAll("\\s+", " ");
     }
 
     private static String formatLoad(String load) {

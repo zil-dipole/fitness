@@ -3,6 +3,7 @@ package com.example.fitnessbot.service;
 import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.model.*;
 import com.example.fitnessbot.repository.ExerciseRepository;
+import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
 import com.example.fitnessbot.repository.WorkoutSessionRepository;
 import com.example.fitnessbot.repository.WorkoutSetLogRepository;
@@ -39,11 +40,14 @@ class WorkoutServiceTest {
     @Mock
     private ExerciseRepository exerciseRepository;
 
+    @Mock
+    private TrainingDayRepository trainingDayRepository;
+
     private WorkoutService workoutService;
 
     @BeforeEach
     void setUp() {
-        workoutService = new WorkoutService(userRepository, workoutSessionRepository, workoutSetLogRepository, exerciseRepository);
+        workoutService = new WorkoutService(userRepository, workoutSessionRepository, workoutSetLogRepository, exerciseRepository, trainingDayRepository);
     }
 
     @Test
@@ -75,6 +79,30 @@ class WorkoutServiceTest {
         assertThat(view.repsOrDuration()).isEqualTo("8");
         assertThat(view.videoUrls()).containsExactly("https://video.example/bench");
         assertThat(view.previousWeightKg()).isNull();
+    }
+
+    @Test
+    void startActiveTrainingDayLoadsExerciseVideosFromRepository() throws Exception {
+        TrainingDay activeTrainingDay = trainingDayWithExercises();
+        activeTrainingDay.getExercises().getFirst().setVideoUrls(List.of());
+        TrainingDay loadedTrainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(activeTrainingDay);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(trainingDayRepository.findByIdWithExercises(10L)).thenReturn(Optional.of(loadedTrainingDay));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.empty());
+        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> {
+            WorkoutSession session = invocation.getArgument(0);
+            session.setId(100L);
+            return session;
+        });
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WorkoutExerciseView view = workoutService.startActiveTrainingDay(TELEGRAM_USER_ID);
+
+        assertThat(view.videoUrls()).containsExactly("https://video.example/bench");
     }
 
     @Test

@@ -190,8 +190,10 @@ class FitnessTelegramBotUnitTest {
             }
             InlineKeyboardButton firstButton = markup.getKeyboard().getFirst().getFirst();
             return "HTML".equals(message.getParseMode())
-                    && message.getText().contains("Saved set 1: 60 kg.")
-                    && message.getText().contains("Exercise 1/2")
+                    && message.getText().contains("<b>60 kg saved</b> · set 1")
+                    && message.getText().contains("🔥 <b>Bench Press</b>")
+                    && message.getText().contains("Load for set 2")
+                    && !message.getText().contains("Exercise 1/2")
                     && "Use 60 kg".equals(firstButton.getText())
                     && WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK.equals(firstButton.getCallbackData());
         }));

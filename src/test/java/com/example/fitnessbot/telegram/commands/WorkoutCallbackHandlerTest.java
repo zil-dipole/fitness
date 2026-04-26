@@ -58,16 +58,25 @@ class WorkoutCallbackHandlerTest {
 
         assertThat(response.getChatId()).isEqualTo(String.valueOf(CHAT_ID));
         assertThat(response.getParseMode()).isEqualTo("HTML");
-        assertThat(response.getText()).contains("Training day started");
-        assertThat(response.getText()).contains("Exercise 1/2");
+        assertThat(response.getText()).startsWith("🔥 <b>Bench Press</b>");
+        assertThat(response.getText()).contains("Set 1/3 → <b>8 reps</b>");
+        assertThat(response.getText()).contains("• Warm up first");
+        assertThat(response.getText()).doesNotContain("Training day started");
+        assertThat(response.getText()).doesNotContain("Now:");
+        assertThat(response.getText()).doesNotContain("Exercise 1/2");
+        assertThat(response.getText()).doesNotContain("Reps/Duration");
+        assertThat(response.getText()).doesNotContain("Previous loads");
         assertThat(response.getText()).contains("Bench Press");
-        assertThat(response.getText()).contains("https://video.example/bench");
-        assertThat(response.getText()).contains("25 Apr 2026: 55 kg / red band / no load");
+        assertThat(response.getText()).contains("🎥 https://video.example/bench");
+        assertThat(response.getText()).contains("Last 25 Apr: 55 kg / red band / no load");
+        assertThat(response.getText()).contains("Load for set 1");
+        assertThat(response.getText()).contains("60 · red band · bodyweight · none");
+        assertThat(response.getText().split("\\R")).hasSizeLessThanOrEqualTo(6);
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
         assertThat(markup.getKeyboard().getFirst().getFirst().getText()).isEqualTo("Use 55 kg");
         assertThat(markup.getKeyboard().getFirst().getFirst().getCallbackData()).isEqualTo(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK);
-        assertThat(markup.getKeyboard().get(1).getFirst().getText()).isEqualTo("No Load");
+        assertThat(markup.getKeyboard().get(1).getFirst().getText()).isEqualTo("No load");
         assertThat(markup.getKeyboard().get(1).getFirst().getCallbackData()).isEqualTo(WorkoutMessageFormatter.NO_LOAD_CALLBACK);
     }
 
@@ -92,8 +101,10 @@ class WorkoutCallbackHandlerTest {
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
-        assertThat(response.getText()).contains("Saved set 1: no load.");
-        assertThat(response.getText()).contains("Exercise 1/2");
+        assertThat(response.getText()).contains("<b>no load saved</b> · set 1");
+        assertThat(response.getText()).contains("🔥 <b>Bench Press</b>");
+        assertThat(response.getText()).doesNotContain("Exercise 1/2");
+        assertThat(response.getText().split("\\R")).hasSizeLessThanOrEqualTo(7);
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
         verify(workoutService).recordWeightForCurrentSet(TELEGRAM_USER_ID, "none");
     }
@@ -106,8 +117,9 @@ class WorkoutCallbackHandlerTest {
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK));
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
-        assertThat(response.getText()).contains("Saved set 1: 55 kg.");
-        assertThat(response.getText()).contains("Exercise 1/2");
+        assertThat(response.getText()).contains("<b>55 kg saved</b> · set 1");
+        assertThat(response.getText()).contains("🔥 <b>Bench Press</b>");
+        assertThat(response.getText()).doesNotContain("Exercise 1/2");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
         verify(workoutService).recordPreviousWeightForCurrentSet(TELEGRAM_USER_ID);
     }

@@ -3,6 +3,7 @@ package com.example.fitnessbot.service;
 import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.model.*;
 import com.example.fitnessbot.repository.ExerciseRepository;
+import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
 import com.example.fitnessbot.repository.WorkoutSessionRepository;
 import com.example.fitnessbot.repository.WorkoutSetLogRepository;
@@ -63,15 +64,18 @@ public class WorkoutService {
     private final WorkoutSessionRepository workoutSessionRepository;
     private final WorkoutSetLogRepository workoutSetLogRepository;
     private final ExerciseRepository exerciseRepository;
+    private final TrainingDayRepository trainingDayRepository;
 
     public WorkoutService(UserRepository userRepository,
                           WorkoutSessionRepository workoutSessionRepository,
                           WorkoutSetLogRepository workoutSetLogRepository,
-                          ExerciseRepository exerciseRepository) {
+                          ExerciseRepository exerciseRepository,
+                          TrainingDayRepository trainingDayRepository) {
         this.userRepository = userRepository;
         this.workoutSessionRepository = workoutSessionRepository;
         this.workoutSetLogRepository = workoutSetLogRepository;
         this.exerciseRepository = exerciseRepository;
+        this.trainingDayRepository = trainingDayRepository;
     }
 
     @Transactional(readOnly = true)
@@ -103,7 +107,7 @@ public class WorkoutService {
         User user = userRepository.findByTelegramId(telegramUserId)
                 .orElseThrow(() -> new WorkoutException("You don't have an active training day."));
 
-        TrainingDay activeTrainingDay = user.getActiveTrainingDay();
+        TrainingDay activeTrainingDay = loadTrainingDayWithExerciseVideos(user.getActiveTrainingDay());
         if (activeTrainingDay == null) {
             throw new WorkoutException("You don't have an active training day.");
         }
@@ -145,7 +149,7 @@ public class WorkoutService {
             return new WeightEntryResult(
                     false,
                     false,
-                    "Send load for this set, for example: 60, red band, or bodyweight. Send none for no load.",
+                    "👉 Send load for this set\n60, red band, bodyweight, none",
                     null
             );
         }
@@ -255,7 +259,7 @@ public class WorkoutService {
             return activeSession.get();
         }
 
-        TrainingDay activeTrainingDay = user.getActiveTrainingDay();
+        TrainingDay activeTrainingDay = loadTrainingDayWithExerciseVideos(user.getActiveTrainingDay());
         if (activeTrainingDay == null) {
             throw new WorkoutException("You don't have an active workout session.");
         }
@@ -390,9 +394,9 @@ public class WorkoutService {
     }
 
     private WorkoutExerciseView toView(WorkoutSession session) {
-        TrainingDay trainingDay = session.getTrainingDay();
+        TrainingDay trainingDay = loadTrainingDayWithExerciseVideos(session.getTrainingDay());
         List<Exercise> exercises = orderedExercises(trainingDay);
-        Exercise exercise = session.getCurrentExercise();
+        Exercise exercise = loadedCurrentExercise(exercises, session.getCurrentExercise());
         int exerciseIndex = exerciseIndex(exercises, exercise);
         Optional<CircuitGroup> circuitGroup = circuitGroup(exercises, exercise);
         int totalSets = circuitGroup.map(CircuitGroup::rounds).orElseGet(() -> totalSets(exercise));
@@ -413,6 +417,34 @@ public class WorkoutService {
                 previousLoadFor(session, exercise),
                 historyFor(session, exercise)
         );
+    }
+
+    private TrainingDay loadTrainingDayWithExerciseVideos(TrainingDay trainingDay) {
+        if (trainingDay == null || trainingDay.getId() == null) {
+            return trainingDay;
+        }
+
+        Optional<TrainingDay> loadedTrainingDay = trainingDayRepository.findByIdWithExercises(trainingDay.getId());
+        TrainingDay result = loadedTrainingDay == null ? trainingDay : loadedTrainingDay.orElse(trainingDay);
+        if (result.getExercises() != null) {
+            result.getExercises().forEach(exercise -> {
+                if (exercise.getVideoUrls() != null) {
+                    exercise.getVideoUrls().size();
+                }
+            });
+        }
+        return result;
+    }
+
+    private Exercise loadedCurrentExercise(List<Exercise> exercises, Exercise currentExercise) {
+        if (currentExercise == null || currentExercise.getId() == null) {
+            return currentExercise;
+        }
+
+        return exercises.stream()
+                .filter(exercise -> sameId(exercise.getId(), currentExercise.getId()))
+                .findFirst()
+                .orElse(currentExercise);
     }
 
     private List<WorkoutHistoryEntry> historyFor(WorkoutSession session, Exercise exercise) {

@@ -16,7 +16,6 @@ spring:
 
   # JPA/Hibernate Configuration for tests
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
     show-sql: true

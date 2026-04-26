@@ -41,7 +41,7 @@ public class WorkoutCallbackHandler implements CallbackQueryHandler {
             Long telegramUserId = callbackQuery.getFrom().getId();
             if (WorkoutMessageFormatter.START_ACTIVE_DAY_CALLBACK.equals(data)) {
                 WorkoutService.WorkoutExerciseView view = workoutService.startActiveTrainingDay(telegramUserId);
-                response.setText("Training day started.\n\n" + WorkoutMessageFormatter.formatExerciseView(view));
+                response.setText(WorkoutMessageFormatter.formatExerciseView(view));
                 response.setParseMode("HTML");
                 response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard(view));
                 return response;

@@ -8,7 +8,6 @@ spring:
 
   # JPA/Hibernate Configuration
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
     show-sql: true
