@@ -4,7 +4,9 @@ import com.example.fitnessbot.service.WorkoutService;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -12,6 +14,7 @@ import java.util.stream.Collectors;
 public final class WorkoutMessageFormatter {
 
     public static final String START_ACTIVE_DAY_CALLBACK = "start_active_day";
+    public static final String PREVIOUS_WEIGHT_CALLBACK = "previous_weight";
     public static final String NO_LOAD_CALLBACK = "none_load";
     public static final String SKIP_EXERCISE_CALLBACK = "skip_workout_exercise";
     public static final String FINISH_WORKOUT_CALLBACK = "finish_workout";
@@ -80,6 +83,19 @@ public final class WorkoutMessageFormatter {
     }
 
     public static InlineKeyboardMarkup exerciseKeyboard() {
+        return exerciseKeyboard(null);
+    }
+
+    public static InlineKeyboardMarkup exerciseKeyboard(WorkoutService.WorkoutExerciseView view) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        if (view != null && view.previousWeightKg() != null && view.previousWeightKg() > 0) {
+            InlineKeyboardButton previousWeightButton = new InlineKeyboardButton();
+            previousWeightButton.setText("Use " + formatWeight(view.previousWeightKg()) + " kg");
+            previousWeightButton.setCallbackData(PREVIOUS_WEIGHT_CALLBACK);
+            rows.add(List.of(previousWeightButton));
+        }
+
         InlineKeyboardButton noLoadButton = new InlineKeyboardButton();
         noLoadButton.setText("No Load");
         noLoadButton.setCallbackData(NO_LOAD_CALLBACK);
@@ -93,7 +109,9 @@ public final class WorkoutMessageFormatter {
         finishButton.setCallbackData(FINISH_WORKOUT_CALLBACK);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(List.of(List.of(noLoadButton), List.of(skipButton, finishButton)));
+        rows.add(List.of(noLoadButton));
+        rows.add(List.of(skipButton, finishButton));
+        markup.setKeyboard(rows);
         return markup;
     }
 
@@ -121,5 +139,9 @@ public final class WorkoutMessageFormatter {
             return "no load";
         }
         return TrainingDayMessageFormatter.escapeHtml(load);
+    }
+
+    private static String formatWeight(double weight) {
+        return BigDecimal.valueOf(weight).stripTrailingZeros().toPlainString();
     }
 }

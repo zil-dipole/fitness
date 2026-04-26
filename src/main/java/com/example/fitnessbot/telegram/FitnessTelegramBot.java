@@ -366,7 +366,9 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
             sendMessage.setText("✅ Training day added to your program! (Total: " +
-                               session.getTrainingDaysCount() + " days)");
+                               session.getTrainingDaysCount() + " days)\n" +
+                               "When you're done, press the \"Finish Program\" button or send /finish_program.");
+            sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
 
             sendTelegramMessage(sendMessage);
         } catch (Exception e) {
@@ -402,7 +404,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             } else {
                 response.setText(WorkoutMessageFormatter.formatExerciseResult(result.message(), result.exerciseView()));
                 response.setParseMode("HTML");
-                response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard());
+                response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard(result.exerciseView()));
             }
 
             sendTelegramMessage(response);

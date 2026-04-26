@@ -175,6 +175,84 @@ class ProgramServiceTest {
     }
 
     @Test
+    void testAdvanceActiveTrainingDayForUserMovesToNextTrainingDay() {
+        Long telegramUserId = 123L;
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(telegramUserId);
+
+        Program program = new Program();
+        program.setId(10L);
+        user.setActiveProgram(program);
+
+        TrainingDay firstDay = new TrainingDay();
+        firstDay.setId(100L);
+        firstDay.setTitle("Day 1");
+        TrainingDay secondDay = new TrainingDay();
+        secondDay.setId(101L);
+        secondDay.setTitle("Day 2");
+        user.setActiveTrainingDay(firstDay);
+
+        ProgramTrainingDay firstLink = new ProgramTrainingDay();
+        firstLink.setProgram(program);
+        firstLink.setTrainingDay(firstDay);
+        firstLink.setPosition(1);
+        ProgramTrainingDay secondLink = new ProgramTrainingDay();
+        secondLink.setProgram(program);
+        secondLink.setTrainingDay(secondDay);
+        secondLink.setPosition(2);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(10L)).thenReturn(List.of(firstLink, secondLink));
+
+        TrainingDay result = programService.advanceActiveTrainingDayForUser(telegramUserId);
+
+        assertThat(result).isEqualTo(secondDay);
+        assertThat(user.getActiveTrainingDay()).isEqualTo(secondDay);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void testAdvanceActiveTrainingDayForUserWrapsToFirstTrainingDay() {
+        Long telegramUserId = 123L;
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(telegramUserId);
+
+        Program program = new Program();
+        program.setId(10L);
+        user.setActiveProgram(program);
+
+        TrainingDay firstDay = new TrainingDay();
+        firstDay.setId(100L);
+        firstDay.setTitle("Day 1");
+        TrainingDay secondDay = new TrainingDay();
+        secondDay.setId(101L);
+        secondDay.setTitle("Day 2");
+        user.setActiveTrainingDay(secondDay);
+
+        ProgramTrainingDay firstLink = new ProgramTrainingDay();
+        firstLink.setProgram(program);
+        firstLink.setTrainingDay(firstDay);
+        firstLink.setPosition(1);
+        ProgramTrainingDay secondLink = new ProgramTrainingDay();
+        secondLink.setProgram(program);
+        secondLink.setTrainingDay(secondDay);
+        secondLink.setPosition(2);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programTrainingDayRepository.findByProgramIdOrderByPositionAsc(10L)).thenReturn(List.of(firstLink, secondLink));
+
+        TrainingDay result = programService.advanceActiveTrainingDayForUser(telegramUserId);
+
+        assertThat(result).isEqualTo(firstDay);
+        assertThat(user.getActiveTrainingDay()).isEqualTo(firstDay);
+        verify(userRepository).save(user);
+    }
+
+    @Test
     void testStartProgramCreationSuccess() throws Exception {
         // Given
         Long telegramUserId = 123L;

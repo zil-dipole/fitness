@@ -112,4 +112,38 @@ class TrainingDayServiceIntegrationTest extends AbstractWithDbTest {
         assertThat(retrievedUser.getTelegramId()).isEqualTo(randomTelegramId);
         assertThat(retrievedUser.getWeightKg()).isEqualTo(80.0);
     }
+
+    @Test
+    void repeatedExerciseLinksToFirstCanonicalExerciseForUser() {
+        long randomTelegramId = new Random().nextLong();
+
+        User testUser = new User();
+        testUser.setTelegramId(randomTelegramId);
+        testUser.setName("Canonical Exercise User");
+        testUser = userRepository.save(testUser);
+
+        TrainingDay firstDay = trainingDayService.processForwardedMessage(testUser.getTelegramId(), """
+                Workout 1:
+
+                Main:
+                - Bench Press 3x8
+                """);
+        TrainingDay secondDay = trainingDayService.processForwardedMessage(testUser.getTelegramId(), """
+                Workout 2:
+
+                Main:
+                - Bench   Press 4x6
+                """);
+
+        Exercise firstExercise = firstDay.getExercises().getFirst();
+        Exercise secondExercise = secondDay.getExercises().getFirst();
+
+        assertThat(firstExercise.getId()).isNotNull();
+        assertThat(firstExercise.getNormalizedName()).isEqualTo("bench press");
+        assertThat(firstExercise.getCanonicalExercise()).isNull();
+        assertThat(secondExercise.getId()).isNotEqualTo(firstExercise.getId());
+        assertThat(secondExercise.getNormalizedName()).isEqualTo("bench press");
+        assertThat(secondExercise.getCanonicalExercise()).isNotNull();
+        assertThat(secondExercise.getCanonicalExercise().getId()).isEqualTo(firstExercise.getId());
+    }
 }

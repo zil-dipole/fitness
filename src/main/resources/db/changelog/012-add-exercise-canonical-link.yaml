@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-add-exercise-canonical-link
+      author: developer
+      validCheckSum:
+        - 9:7eb742d832ffaf339b575e50e47bffab
+      changes:
+        - addColumn:
+            tableName: exercises
+            columns:
+              - column:
+                  name: canonical_exercise_id
+                  type: bigint
+              - column:
+                  name: normalized_name
+                  type: varchar(255)
+        - addForeignKeyConstraint:
+            baseTableName: exercises
+            baseColumnNames: canonical_exercise_id
+            constraintName: fk_exercise_canonical_exercise
+            referencedTableName: exercises
+            referencedColumnNames: id
+        - sql:
+            sql: "update exercises set normalized_name = lower(regexp_replace(trim(name), '[[:space:]]+', ' ', 'g')) where name is not null"
+        - createIndex:
+            tableName: exercises
+            indexName: idx_exercises_normalized_name
+            columns:
+              - column:
+                  name: normalized_name
+        - createIndex:
+            tableName: exercises
+            indexName: idx_exercises_canonical_exercise
+            columns:
+              - column:
+                  name: canonical_exercise_id

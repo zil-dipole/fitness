@@ -52,8 +52,10 @@ public class TrainingDayParser {
 
             // Section header – ends with ':'
             if (line.endsWith(":")) {
-                if (day.getTitle() == null && exercises.isEmpty() && looksLikeTrainingDayTitle(line)) {
-                    day.setTitle(line);
+                String normalizedTitle = TrainingDayTitleNormalizer.normalize(line);
+                if (day.getTitle() == null && exercises.isEmpty()
+                        && TrainingDayTitleNormalizer.looksLikeTrainingDayTitle(normalizedTitle)) {
+                    day.setTitle(normalizedTitle);
                 } else {
                     currentSection = line.substring(0, line.length() - 1).trim();
                 }
@@ -138,11 +140,6 @@ public class TrainingDayParser {
 
         // More sophisticated validation could be added here if needed
         return true;
-    }
-
-    private boolean looksLikeTrainingDayTitle(String line) {
-        String lower = line.toLowerCase();
-        return lower.contains("трен") || lower.contains("training") || lower.contains("workout");
     }
 
     private void setNotesIfPresent(Exercise exercise, String notes) {

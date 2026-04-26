@@ -1,5 +1,8 @@
 package com.example.fitnessbot.telegram.commands;
 
+import com.example.fitnessbot.model.Exercise;
+import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.WorkoutService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,16 +30,20 @@ class WorkoutCallbackHandlerTest {
     @Mock
     private WorkoutService workoutService;
 
+    @Mock
+    private ProgramService programService;
+
     private WorkoutCallbackHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new WorkoutCallbackHandler(workoutService);
+        handler = new WorkoutCallbackHandler(workoutService, programService);
     }
 
     @Test
     void canHandleWorkoutCallbacks() {
         assertThat(handler.canHandle(callback(WorkoutMessageFormatter.START_ACTIVE_DAY_CALLBACK))).isTrue();
+        assertThat(handler.canHandle(callback(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK))).isTrue();
         assertThat(handler.canHandle(callback(WorkoutMessageFormatter.NO_LOAD_CALLBACK))).isTrue();
         assertThat(handler.canHandle(callback(WorkoutMessageFormatter.SKIP_EXERCISE_CALLBACK))).isTrue();
         assertThat(handler.canHandle(callback(WorkoutMessageFormatter.FINISH_WORKOUT_CALLBACK))).isTrue();
@@ -58,8 +65,10 @@ class WorkoutCallbackHandlerTest {
         assertThat(response.getText()).contains("25 Apr 2026: 55 kg / red band / no load");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
-        assertThat(markup.getKeyboard().getFirst().getFirst().getText()).isEqualTo("No Load");
-        assertThat(markup.getKeyboard().getFirst().getFirst().getCallbackData()).isEqualTo(WorkoutMessageFormatter.NO_LOAD_CALLBACK);
+        assertThat(markup.getKeyboard().getFirst().getFirst().getText()).isEqualTo("Use 55 kg");
+        assertThat(markup.getKeyboard().getFirst().getFirst().getCallbackData()).isEqualTo(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK);
+        assertThat(markup.getKeyboard().get(1).getFirst().getText()).isEqualTo("No Load");
+        assertThat(markup.getKeyboard().get(1).getFirst().getCallbackData()).isEqualTo(WorkoutMessageFormatter.NO_LOAD_CALLBACK);
     }
 
     @Test
@@ -77,12 +86,63 @@ class WorkoutCallbackHandlerTest {
     }
 
     @Test
+    void previousWeightButtonRecordsCurrentSetWithPreviousWeight() throws Exception {
+        when(workoutService.recordPreviousWeightForCurrentSet(TELEGRAM_USER_ID))
+                .thenReturn(new WorkoutService.WeightEntryResult(true, false, "Saved set 1: 55 kg.", exerciseView()));
+
+        SendMessage response = handler.handle(update(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK));
+
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("Saved set 1: 55 kg.");
+        assertThat(response.getText()).contains("Exercise 1/2");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
+        verify(workoutService).recordPreviousWeightForCurrentSet(TELEGRAM_USER_ID);
+    }
+
+    @Test
+    void previousWeightButtonShowsMessageWhenNoPreviousWeightExists() throws Exception {
+        when(workoutService.recordPreviousWeightForCurrentSet(TELEGRAM_USER_ID))
+                .thenReturn(new WorkoutService.WeightEntryResult(
+                        false,
+                        false,
+                        "No previous weight is available for this exercise.",
+                        null
+                ));
+
+        SendMessage response = handler.handle(update(WorkoutMessageFormatter.PREVIOUS_WEIGHT_CALLBACK));
+
+        assertThat(response.getText()).isEqualTo("No previous weight is available for this exercise.");
+        assertThat(response.getParseMode()).isNull();
+        assertThat(response.getReplyMarkup()).isNull();
+    }
+
+    @Test
     void finishWorkoutShowsCompletionMessage() {
         when(workoutService.finishActiveWorkout(TELEGRAM_USER_ID)).thenReturn(true);
+        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDay());
 
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.FINISH_WORKOUT_CALLBACK));
 
-        assertThat(response.getText()).isEqualTo("Training day finished.");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("Training day finished.");
+        assertThat(response.getText()).contains("Next active training day:");
+        assertThat(response.getText()).contains("Lower Body");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
+    }
+
+    @Test
+    void completedWorkoutResultShowsNextTrainingDay() throws Exception {
+        when(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"))
+                .thenReturn(new WorkoutService.WeightEntryResult(true, true, "Saved set 3: Grey green band. Training day completed.", null));
+        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDay());
+
+        SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
+
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("Saved set 3: Grey green band. Training day completed.");
+        assertThat(response.getText()).contains("Next active training day:");
+        assertThat(response.getText()).contains("Lower Body");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
     private WorkoutService.WorkoutExerciseView exerciseView() {
@@ -97,11 +157,21 @@ class WorkoutCallbackHandlerTest {
                 "8",
                 "Warm up first",
                 List.of("https://video.example/bench"),
+                55.0,
                 List.of(new WorkoutService.WorkoutHistoryEntry(
                         LocalDateTime.of(2026, 4, 25, 12, 0),
                         List.of("55 kg", "red band", "no load")
                 ))
         );
+    }
+
+    private TrainingDay nextTrainingDay() {
+        TrainingDay trainingDay = new TrainingDay();
+        trainingDay.setTitle("Lower Body");
+        Exercise exercise = new Exercise();
+        exercise.setName("Squat");
+        trainingDay.setExercises(List.of(exercise));
+        return trainingDay;
     }
 
     private Update update(String data) {

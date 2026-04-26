@@ -95,7 +95,7 @@ class TrainingDayServiceTest {
         verify(parser).parse(rawText);
         verify(trainingDayRepository).save(any(TrainingDay.class));
         verifyNoInteractions(openAiTrainingDayParser);
-        verifyNoMoreInteractions(exerciseRepository);
+        verify(exerciseRepository).findCanonicalExercisesForUser(eq(1L), eq("бег 5 мин"), any());
     }
     
     @Test
@@ -386,5 +386,68 @@ class TrainingDayServiceTest {
         verify(openAiTrainingDayParser).parse(rawText);
         verify(trainingDayRepository).save(any(TrainingDay.class));
         verifyNoInteractions(parser);
+    }
+
+    @Test
+    void testProcessForwardedMessageNormalizesMistypedRussianTitle() {
+        String rawText = "Nhtyz 2:\n\nРазминка:\n- Бег 5 мин\n";
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(false);
+
+        TrainingDay parsedTrainingDay = new TrainingDay();
+        parsedTrainingDay.setTitle("");
+        Exercise exercise = new Exercise();
+        exercise.setName("Бег 5 мин");
+        exercise.setSection("Разминка");
+        parsedTrainingDay.setExercises(List.of(exercise));
+
+        when(userRepository.findByTelegramId(TEST_TELEGRAM_ID)).thenReturn(Optional.of(user));
+        when(parser.parse(rawText)).thenReturn(parsedTrainingDay);
+        when(trainingDayRepository.save(any(TrainingDay.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TrainingDay result = trainingDayService.processForwardedMessage(TEST_TELEGRAM_ID, rawText);
+
+        assertThat(result.getTitle()).isEqualTo("Треня 2:");
+    }
+
+    @Test
+    void testProcessForwardedMessageLinksRepeatedExerciseToCanonicalExercise() {
+        String rawText = "Треня 2:\n\nMain:\n- Bench Press 3 x 8\n";
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(false);
+
+        Exercise canonicalExercise = new Exercise();
+        canonicalExercise.setId(99L);
+        canonicalExercise.setName("Bench Press");
+        canonicalExercise.setNormalizedName("bench press");
+        canonicalExercise.setLastWeightKg(75.0);
+
+        TrainingDay parsedTrainingDay = new TrainingDay();
+        parsedTrainingDay.setTitle("Треня 2:");
+        Exercise exercise = new Exercise();
+        exercise.setName("Bench Press");
+        exercise.setSection("Main");
+        exercise.setSets(3);
+        exercise.setRepsOrDuration("8");
+        parsedTrainingDay.setExercises(List.of(exercise));
+
+        when(userRepository.findByTelegramId(TEST_TELEGRAM_ID)).thenReturn(Optional.of(user));
+        when(parser.parse(rawText)).thenReturn(parsedTrainingDay);
+        when(exerciseRepository.findCanonicalExercisesForUser(eq(1L), eq("bench press"), any()))
+                .thenReturn(List.of(canonicalExercise));
+        when(trainingDayRepository.save(any(TrainingDay.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TrainingDay result = trainingDayService.processForwardedMessage(TEST_TELEGRAM_ID, rawText);
+
+        Exercise savedExercise = result.getExercises().getFirst();
+        assertThat(savedExercise.getNormalizedName()).isEqualTo("bench press");
+        assertThat(savedExercise.getCanonicalExercise()).isEqualTo(canonicalExercise);
+        assertThat(savedExercise.getLastWeightKg()).isEqualTo(75.0);
     }
 }

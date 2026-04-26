@@ -323,6 +323,22 @@ class TrainingDayParserTest {
     }
 
     @Test
+    void testParseNormalizesMistypedRussianTitle() {
+        String rawText = """
+                Nhtyz 2:
+
+                Разминка:
+                - Бег 5 мин
+                """;
+
+        TrainingDay day = parser.parse(rawText);
+
+        assertThat(day.getTitle()).isEqualTo("Треня 2:");
+        assertThat(day.getExercises()).hasSize(1);
+        assertThat(day.getExercises().getFirst().getSection()).isEqualTo("Разминка");
+    }
+
+    @Test
     void testParseWithEmptySections() {
         String rawText = """
                 Треня 1:

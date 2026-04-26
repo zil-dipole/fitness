@@ -19,3 +19,5 @@ databaseChangeLog:
       file: db/changelog/010-add-user-ai-parser-flag.yaml
   - include:
       file: db/changelog/011-allow-workout-set-load-description.yaml
+  - include:
+      file: db/changelog/012-add-exercise-canonical-link.yaml

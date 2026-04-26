@@ -4,10 +4,10 @@ import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.TrainingDay;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages ongoing program creation sessions for users
@@ -39,7 +39,7 @@ public class ProgramCreationSessionManager {
      */
     public static class ProgramCreationSession {
         private final Program program;
-        private final Map<Long, TrainingDay> trainingDays = new ConcurrentHashMap<>();
+        private final List<TrainingDay> trainingDays = new CopyOnWriteArrayList<>();
 
         public ProgramCreationSession(Program program) {
             this.program = program;
@@ -50,11 +50,22 @@ public class ProgramCreationSessionManager {
         }
         
         public void addTrainingDay(TrainingDay trainingDay) {
-            trainingDays.put(trainingDay.getId(), trainingDay);
+            Long trainingDayId = trainingDay.getId();
+            if (trainingDayId != null) {
+                for (int i = 0; i < trainingDays.size(); i++) {
+                    TrainingDay existingTrainingDay = trainingDays.get(i);
+                    if (trainingDayId.equals(existingTrainingDay.getId())) {
+                        trainingDays.set(i, trainingDay);
+                        return;
+                    }
+                }
+            }
+
+            trainingDays.add(trainingDay);
         }
         
         public List<TrainingDay> getTrainingDays() {
-            return trainingDays.values().stream().toList();
+            return List.copyOf(trainingDays);
         }
         
         public int getTrainingDaysCount() {

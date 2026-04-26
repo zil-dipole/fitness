@@ -336,6 +336,17 @@ class TelegramUiInteractionTest {
         // Verify program was created with both training days
         verify(trainingDayService, times(2)).processForwardedMessage(eq(USER_ID), anyString());
         assertFalse(sessionManager.hasActiveSession(USER_ID));
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot, atLeastOnce()).sendTelegramMessage(captor.capture());
+
+        assertTrue(captor.getAllValues().stream().anyMatch(message ->
+                message.getText() != null
+                        && message.getText().contains("Training day added to your program!")
+                        && message.getText().contains("Finish Program")
+                        && message.getText().contains("/finish_program")
+                        && message.getReplyMarkup() instanceof InlineKeyboardMarkup
+        ));
     }
 
     @Test

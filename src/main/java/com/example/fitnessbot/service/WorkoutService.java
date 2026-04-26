@@ -34,6 +34,7 @@ public class WorkoutService {
             String repsOrDuration,
             String notes,
             List<String> videoUrls,
+            Double previousWeightKg,
             List<WorkoutHistoryEntry> history
     ) {
     }
@@ -154,10 +155,7 @@ public class WorkoutService {
         setLog.setCreatedAt(LocalDateTime.now());
         workoutSetLogRepository.save(setLog);
 
-        if (load.weightKg() != null) {
-            exercise.setLastWeightKg(load.weightKg());
-            exerciseRepository.save(exercise);
-        }
+        updateLastWeight(exercise, load.weightKg());
 
         List<Exercise> exercises = orderedExercises(session.getTrainingDay());
         int totalSets = totalSets(exercise);
@@ -189,6 +187,32 @@ public class WorkoutService {
         session.setCompletedAt(LocalDateTime.now());
         workoutSessionRepository.save(session);
         return new WeightEntryResult(true, true, "Saved set " + savedSetNumber + ": " + load.displayValue() + ". Training day completed.", null);
+    }
+
+    @Transactional
+    public WeightEntryResult recordPreviousWeightForCurrentSet(Long telegramUserId) throws WorkoutException {
+        User user = userRepository.findByTelegramId(telegramUserId)
+                .orElseThrow(() -> new WorkoutException("You don't have an active workout session."));
+        WorkoutSession session = workoutSessionRepository
+                .findFirstByUserIdAndStatusOrderByStartedAtDesc(user.getId(), WorkoutSessionStatus.IN_PROGRESS)
+                .orElseThrow(() -> new WorkoutException("You don't have an active workout session."));
+
+        Exercise exercise = session.getCurrentExercise();
+        if (exercise == null) {
+            throw new WorkoutException("Current workout exercise is missing.");
+        }
+
+        Double previousWeight = previousWeightFor(exercise);
+        if (previousWeight == null) {
+            return new WeightEntryResult(
+                    false,
+                    false,
+                    "No previous weight is available for this exercise.",
+                    null
+            );
+        }
+
+        return recordWeightForCurrentSet(telegramUserId, formatWeight(previousWeight));
     }
 
     @Transactional
@@ -265,25 +289,39 @@ public class WorkoutService {
                 exercise.getRepsOrDuration(),
                 exercise.getNotes(),
                 exercise.getVideoUrls() == null ? List.of() : List.copyOf(exercise.getVideoUrls()),
+                previousWeightFor(exercise),
                 historyFor(session, exercise)
         );
     }
 
     private List<WorkoutHistoryEntry> historyFor(WorkoutSession session, Exercise exercise) {
-        List<WorkoutSetLog> logs = workoutSetLogRepository
-                .findByUserIdAndExerciseIdAndWorkoutSessionIdNotOrderByCreatedAtDesc(
-                        session.getUser().getId(),
-                        exercise.getId(),
-                        session.getId(),
-                        PageRequest.of(0, HISTORY_LOG_LIMIT)
-                );
+        List<WorkoutHistoryEntry> history = new ArrayList<>();
+
+        List<WorkoutSetLog> currentSessionLogs = Optional.ofNullable(workoutSetLogRepository
+                        .findByWorkoutSessionIdAndExerciseIdOrderBySetNumberAsc(session.getId(), exercise.getId()))
+                .orElseGet(List::of);
+        if (!currentSessionLogs.isEmpty()) {
+            List<String> currentLoads = currentSessionLogs.stream()
+                    .map(this::formatLoad)
+                    .toList();
+            history.add(new WorkoutHistoryEntry(session.getStartedAt(), currentLoads));
+        }
+
+        List<WorkoutSetLog> logs = Optional.ofNullable(workoutSetLogRepository
+                        .findHistoryLogsForExerciseIdentity(
+                                session.getUser().getId(),
+                                canonicalExerciseId(exercise),
+                                exercise.getNormalizedName(),
+                                session.getId(),
+                                PageRequest.of(0, HISTORY_LOG_LIMIT)
+                        ))
+                .orElseGet(List::of);
 
         Map<Long, List<WorkoutSetLog>> logsBySession = new LinkedHashMap<>();
         for (WorkoutSetLog log : logs) {
             logsBySession.computeIfAbsent(log.getWorkoutSession().getId(), ignored -> new ArrayList<>()).add(log);
         }
 
-        List<WorkoutHistoryEntry> history = new ArrayList<>();
         for (List<WorkoutSetLog> sessionLogs : logsBySession.values()) {
             if (history.size() == HISTORY_SESSION_LIMIT) {
                 break;
@@ -374,6 +412,46 @@ public class WorkoutService {
             return setLog.getLoadDescription();
         }
         return "no load";
+    }
+
+    private void updateLastWeight(Exercise exercise, Double weightKg) {
+        if (weightKg == null) {
+            return;
+        }
+
+        exercise.setLastWeightKg(weightKg);
+        exerciseRepository.save(exercise);
+
+        Exercise canonicalExercise = exercise.getCanonicalExercise();
+        if (canonicalExercise != null && !sameId(canonicalExercise.getId(), exercise.getId())) {
+            canonicalExercise.setLastWeightKg(weightKg);
+            exerciseRepository.save(canonicalExercise);
+        }
+    }
+
+    private Double previousWeightFor(Exercise exercise) {
+        if (exercise == null) {
+            return null;
+        }
+        if (exercise.getLastWeightKg() != null && exercise.getLastWeightKg() > 0) {
+            return exercise.getLastWeightKg();
+        }
+
+        Exercise canonicalExercise = exercise.getCanonicalExercise();
+        if (canonicalExercise != null
+                && canonicalExercise.getLastWeightKg() != null
+                && canonicalExercise.getLastWeightKg() > 0) {
+            return canonicalExercise.getLastWeightKg();
+        }
+        return null;
+    }
+
+    private Long canonicalExerciseId(Exercise exercise) {
+        Exercise canonicalExercise = exercise.getCanonicalExercise();
+        if (canonicalExercise != null && canonicalExercise.getId() != null) {
+            return canonicalExercise.getId();
+        }
+        return exercise.getId();
     }
 
     private boolean sameId(Long first, Long second) {

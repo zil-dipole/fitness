@@ -73,6 +73,23 @@ class ActiveDayCommandHandlerTest {
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
+    @Test
+    void testHandleShowsAdvancedTrainingDay() {
+        Update update = createUpdate();
+        TrainingDay trainingDay = new TrainingDay();
+        trainingDay.setTitle("Lower Body");
+        Exercise exercise = new Exercise();
+        exercise.setName("Squat");
+        trainingDay.setExercises(List.of(exercise));
+
+        when(programService.getActiveTrainingDayForUser(TEST_TELEGRAM_ID)).thenReturn(trainingDay);
+
+        SendMessage response = handler.handle(update);
+
+        assertThat(response.getText()).contains("Lower Body");
+        assertThat(response.getText()).contains("Squat");
+    }
+
     private Update createUpdate() {
         Update update = mock(Update.class);
         Message message = mock(Message.class);

@@ -5,14 +5,19 @@ import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.User;
 import com.example.fitnessbot.parser.OpenAiTrainingDayParser;
 import com.example.fitnessbot.parser.TrainingDayParser;
+import com.example.fitnessbot.parser.TrainingDayTitleNormalizer;
 import com.example.fitnessbot.repository.ExerciseRepository;
 import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Service responsible for handling forwarded training‑day messages.
@@ -80,6 +85,7 @@ public class TrainingDayService {
         if ((parsedTrainingDay.getTitle() == null || parsedTrainingDay.getTitle().isBlank()) && lines.length > 0) {
             parsedTrainingDay.setTitle(lines[0].trim());
         }
+        parsedTrainingDay.setTitle(TrainingDayTitleNormalizer.normalize(parsedTrainingDay.getTitle()));
 
         // 5. Set the training day reference for exercises before saving
         List<Exercise> exercises = parsedTrainingDay.getExercises();
@@ -88,6 +94,14 @@ public class TrainingDayService {
             List<Exercise> exerciseList = new ArrayList<>(exercises);
             for (Exercise exercise : exerciseList) {
                 exercise.setTrainingDay(parsedTrainingDay);
+                String normalizedName = normalizeExerciseName(exercise.getName());
+                exercise.setNormalizedName(normalizedName);
+                findCanonicalExercise(user.getId(), normalizedName).ifPresent(canonicalExercise -> {
+                    exercise.setCanonicalExercise(canonicalExercise);
+                    if (exercise.getLastWeightKg() == null) {
+                        exercise.setLastWeightKg(canonicalExercise.getLastWeightKg());
+                    }
+                });
             }
             // Set the modified list back to the training day
             parsedTrainingDay.setExercises(exerciseList);
@@ -100,6 +114,24 @@ public class TrainingDayService {
         }
 
         return savedTrainingDay;
+    }
+
+    private Optional<Exercise> findCanonicalExercise(Long userId, String normalizedName) {
+        if (userId == null || !StringUtils.hasText(normalizedName)) {
+            return Optional.empty();
+        }
+
+        return exerciseRepository.findCanonicalExercisesForUser(userId, normalizedName, PageRequest.of(0, 1))
+                .stream()
+                .findFirst();
+    }
+
+    public static String normalizeExerciseName(String name) {
+        if (!StringUtils.hasText(name)) {
+            return null;
+        }
+
+        return name.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
     
     /**

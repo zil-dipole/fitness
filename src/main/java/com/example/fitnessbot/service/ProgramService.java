@@ -7,6 +7,7 @@ import com.example.fitnessbot.repository.ProgramRepository;
 import com.example.fitnessbot.repository.ProgramTrainingDayRepository;
 import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -177,7 +178,56 @@ public class ProgramService {
     public TrainingDay getActiveTrainingDayForUser(Long telegramUserId) {
         return userRepository.findByTelegramId(telegramUserId)
                 .map(User::getActiveTrainingDay)
+                .map(this::loadTrainingDayWithExercises)
                 .orElse(null);
+    }
+
+    @Transactional
+    public TrainingDay advanceActiveTrainingDayForUser(Long telegramUserId) {
+        Optional<User> optionalUser = userRepository.findByTelegramId(telegramUserId);
+        if (optionalUser.isEmpty()) {
+            return null;
+        }
+
+        User user = optionalUser.get();
+        Program activeProgram = user.getActiveProgram();
+        if (activeProgram == null) {
+            return user.getActiveTrainingDay();
+        }
+
+        List<ProgramTrainingDay> trainingDays = programTrainingDayRepository.findByProgramIdOrderByPositionAsc(activeProgram.getId());
+        if (trainingDays.isEmpty()) {
+            return user.getActiveTrainingDay();
+        }
+
+        TrainingDay currentTrainingDay = user.getActiveTrainingDay();
+        int currentIndex = -1;
+        if (currentTrainingDay != null) {
+            for (int i = 0; i < trainingDays.size(); i++) {
+                TrainingDay candidate = trainingDays.get(i).getTrainingDay();
+                if (candidate != null && candidate.getId() != null && candidate.getId().equals(currentTrainingDay.getId())) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+        }
+
+        int nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % trainingDays.size();
+        TrainingDay nextTrainingDay = trainingDays.get(nextIndex).getTrainingDay();
+        user.setActiveTrainingDay(nextTrainingDay);
+        userRepository.save(user);
+        return loadTrainingDayWithExercises(nextTrainingDay);
+    }
+
+    private TrainingDay loadTrainingDayWithExercises(TrainingDay trainingDay) {
+        if (trainingDay == null || trainingDay.getId() == null) {
+            return trainingDay;
+        }
+        TrainingDay loadedTrainingDay = trainingDayRepository.findByIdWithExercises(trainingDay.getId()).orElse(trainingDay);
+        if (loadedTrainingDay.getExercises() != null) {
+            loadedTrainingDay.getExercises().forEach(exercise -> Hibernate.initialize(exercise.getVideoUrls()));
+        }
+        return loadedTrainingDay;
     }
 
     /**

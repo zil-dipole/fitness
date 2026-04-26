@@ -86,7 +86,7 @@ class CreateProgramCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("Started creating program: \"My Awesome Program\"");
-        assertThat(response.getText()).contains("/finish_program to complete the process");
+        assertThat(response.getText()).contains("press the \"Finish Program\" button or send /finish_program");
 
         verify(programService).startProgramCreation(TEST_USER_ID, "My Awesome Program");
         verify(sessionManager).startSession(TEST_USER_ID, program);

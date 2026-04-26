@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,7 +58,7 @@ class WorkoutServiceTest {
             session.setId(100L);
             return session;
         });
-        when(workoutSetLogRepository.findByUserIdAndExerciseIdAndWorkoutSessionIdNotOrderByCreatedAtDesc(anyLong(), anyLong(), anyLong(), any()))
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
                 .thenReturn(List.of());
 
         WorkoutService.WorkoutExerciseView view = workoutService.startActiveTrainingDay(TELEGRAM_USER_ID);
@@ -71,6 +72,7 @@ class WorkoutServiceTest {
         assertThat(view.totalSets()).isEqualTo(3);
         assertThat(view.repsOrDuration()).isEqualTo("8");
         assertThat(view.videoUrls()).containsExactly("https://video.example/bench");
+        assertThat(view.previousWeightKg()).isNull();
     }
 
     @Test
@@ -79,11 +81,19 @@ class WorkoutServiceTest {
         User user = userWithActiveTrainingDay(trainingDay);
         Exercise exercise = trainingDay.getExercises().getFirst();
         WorkoutSession session = activeSession(user, trainingDay, exercise);
+        List<WorkoutSetLog> currentSessionLogs = new ArrayList<>();
 
         when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
         when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
                 .thenReturn(Optional.of(session));
-        when(workoutSetLogRepository.findByUserIdAndExerciseIdAndWorkoutSessionIdNotOrderByCreatedAtDesc(anyLong(), anyLong(), anyLong(), any()))
+        doAnswer(invocation -> {
+            WorkoutSetLog savedLog = invocation.getArgument(0);
+            currentSessionLogs.add(savedLog);
+            return savedLog;
+        }).when(workoutSetLogRepository).save(any(WorkoutSetLog.class));
+        when(workoutSetLogRepository.findByWorkoutSessionIdAndExerciseIdOrderBySetNumberAsc(100L, 11L))
+                .thenAnswer(invocation -> List.copyOf(currentSessionLogs));
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
                 .thenReturn(List.of());
 
         WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "60,5");
@@ -92,6 +102,8 @@ class WorkoutServiceTest {
         assertThat(result.dayCompleted()).isFalse();
         assertThat(result.message()).contains("Saved set 1: 60.5 kg");
         assertThat(result.exerciseView().currentSetNumber()).isEqualTo(2);
+        assertThat(result.exerciseView().history()).hasSize(1);
+        assertThat(result.exerciseView().history().getFirst().loads()).containsExactly("60.5 kg");
         assertThat(session.getCurrentSetNumber()).isEqualTo(2);
 
         ArgumentCaptor<WorkoutSetLog> logCaptor = ArgumentCaptor.forClass(WorkoutSetLog.class);
@@ -133,7 +145,7 @@ class WorkoutServiceTest {
         when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
         when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
                 .thenReturn(Optional.of(session));
-        when(workoutSetLogRepository.findByUserIdAndExerciseIdAndWorkoutSessionIdNotOrderByCreatedAtDesc(anyLong(), anyLong(), anyLong(), any()))
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
                 .thenReturn(List.of());
 
         WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "red band");
@@ -160,7 +172,7 @@ class WorkoutServiceTest {
         when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
         when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
                 .thenReturn(Optional.of(session));
-        when(workoutSetLogRepository.findByUserIdAndExerciseIdAndWorkoutSessionIdNotOrderByCreatedAtDesc(anyLong(), anyLong(), anyLong(), any()))
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
                 .thenReturn(List.of());
 
         WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none");
@@ -183,6 +195,112 @@ class WorkoutServiceTest {
         assertThat(result.accepted()).isFalse();
         assertThat(result.message()).contains("Send load for this set");
         verifyNoInteractions(userRepository, workoutSessionRepository, workoutSetLogRepository, exerciseRepository);
+    }
+
+    @Test
+    void recordWeightUpdatesCanonicalExerciseLastWeight() throws Exception {
+        TrainingDay trainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise exercise = trainingDay.getExercises().getFirst();
+        Exercise canonicalExercise = new Exercise();
+        canonicalExercise.setId(99L);
+        canonicalExercise.setName("Bench Press");
+        canonicalExercise.setNormalizedName("bench press");
+        exercise.setCanonicalExercise(canonicalExercise);
+        WorkoutSession session = activeSession(user, trainingDay, exercise);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "70");
+
+        assertThat(result.accepted()).isTrue();
+        assertThat(exercise.getLastWeightKg()).isEqualTo(70.0);
+        assertThat(canonicalExercise.getLastWeightKg()).isEqualTo(70.0);
+        verify(exerciseRepository).save(exercise);
+        verify(exerciseRepository).save(canonicalExercise);
+        verify(workoutSetLogRepository).findHistoryLogsForExerciseIdentity(eq(1L), eq(99L), eq("bench press"), eq(100L), any());
+    }
+
+    @Test
+    void recordPreviousWeightUsesCurrentExerciseLastWeight() throws Exception {
+        TrainingDay trainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise exercise = trainingDay.getExercises().getFirst();
+        exercise.setLastWeightKg(72.5);
+        WorkoutSession session = activeSession(user, trainingDay, exercise);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WeightEntryResult result = workoutService.recordPreviousWeightForCurrentSet(TELEGRAM_USER_ID);
+
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.message()).contains("Saved set 1: 72.5 kg");
+        assertThat(result.exerciseView().previousWeightKg()).isEqualTo(72.5);
+
+        ArgumentCaptor<WorkoutSetLog> logCaptor = ArgumentCaptor.forClass(WorkoutSetLog.class);
+        verify(workoutSetLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getWeightKg()).isEqualTo(72.5);
+        assertThat(logCaptor.getValue().getLoadDescription()).isNull();
+    }
+
+    @Test
+    void recordPreviousWeightUsesCanonicalExerciseLastWeight() throws Exception {
+        TrainingDay trainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise exercise = trainingDay.getExercises().getFirst();
+        Exercise canonicalExercise = new Exercise();
+        canonicalExercise.setId(99L);
+        canonicalExercise.setName("Bench Press");
+        canonicalExercise.setNormalizedName("bench press");
+        canonicalExercise.setLastWeightKg(80.0);
+        exercise.setCanonicalExercise(canonicalExercise);
+        WorkoutSession session = activeSession(user, trainingDay, exercise);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WeightEntryResult result = workoutService.recordPreviousWeightForCurrentSet(TELEGRAM_USER_ID);
+
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.message()).contains("Saved set 1: 80 kg");
+        assertThat(exercise.getLastWeightKg()).isEqualTo(80.0);
+        assertThat(canonicalExercise.getLastWeightKg()).isEqualTo(80.0);
+
+        ArgumentCaptor<WorkoutSetLog> logCaptor = ArgumentCaptor.forClass(WorkoutSetLog.class);
+        verify(workoutSetLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getWeightKg()).isEqualTo(80.0);
+        verify(exerciseRepository).save(exercise);
+        verify(exerciseRepository).save(canonicalExercise);
+    }
+
+    @Test
+    void recordPreviousWeightRejectsWhenUnavailable() throws Exception {
+        TrainingDay trainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise exercise = trainingDay.getExercises().getFirst();
+        WorkoutSession session = activeSession(user, trainingDay, exercise);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+
+        WorkoutService.WeightEntryResult result = workoutService.recordPreviousWeightForCurrentSet(TELEGRAM_USER_ID);
+
+        assertThat(result.accepted()).isFalse();
+        assertThat(result.message()).isEqualTo("No previous weight is available for this exercise.");
+        assertThat(result.exerciseView()).isNull();
+        verifyNoInteractions(workoutSetLogRepository, exerciseRepository);
     }
 
     private User userWithActiveTrainingDay(TrainingDay trainingDay) {
@@ -215,6 +333,7 @@ class WorkoutServiceTest {
         bench.setTrainingDay(trainingDay);
         bench.setPosition(1);
         bench.setName("Bench Press");
+        bench.setNormalizedName("bench press");
         bench.setSets(3);
         bench.setRepsOrDuration("8");
         bench.setNotes("Warm up first");
@@ -225,6 +344,7 @@ class WorkoutServiceTest {
         row.setTrainingDay(trainingDay);
         row.setPosition(2);
         row.setName("Row");
+        row.setNormalizedName("row");
         row.setSets(1);
         row.setRepsOrDuration("10");
 

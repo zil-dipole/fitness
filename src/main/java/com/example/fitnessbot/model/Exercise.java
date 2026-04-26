@@ -20,11 +20,19 @@ public class Exercise {
     @JoinColumn(name = "training_day_id", nullable = false)
     private TrainingDay trainingDay;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "canonical_exercise_id")
+    private Exercise canonicalExercise;
+
     /** Order inside the day */
     private Integer position;
 
     private String section; // e.g., "Активация разминка"
     private String name;    // exercise name
+
+    @Column(name = "normalized_name")
+    private String normalizedName;
+
     private Integer sets;   // optional
 
     @Column(name = "reps_or_duration")
@@ -64,6 +72,14 @@ public class Exercise {
      */
     public void setTrainingDay(TrainingDay trainingDay) {
         this.trainingDay = trainingDay;
+    }
+
+    public Exercise getCanonicalExercise() {
+        return canonicalExercise;
+    }
+
+    public void setCanonicalExercise(Exercise canonicalExercise) {
+        this.canonicalExercise = canonicalExercise;
     }
 
     /**
@@ -112,6 +128,14 @@ public class Exercise {
      */
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getNormalizedName() {
+        return normalizedName;
+    }
+
+    public void setNormalizedName(String normalizedName) {
+        this.normalizedName = normalizedName;
     }
 
     /**
