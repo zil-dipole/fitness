@@ -4,6 +4,7 @@ import com.example.fitnessbot.exception.ProgramException;
 import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.WorkoutService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,9 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -26,11 +30,14 @@ class StartProgramCallbackHandlerTest {
     @Mock
     private ProgramService programService;
 
+    @Mock
+    private WorkoutService workoutService;
+
     private StartProgramCallbackHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new StartProgramCallbackHandler(programService);
+        handler = new StartProgramCallbackHandler(programService, workoutService);
     }
 
     @Test
@@ -51,13 +58,24 @@ class StartProgramCallbackHandlerTest {
 
         when(programService.startProgramForUser(1L, TEST_TELEGRAM_ID))
                 .thenReturn(new ProgramService.ActiveProgramSelection(program, trainingDay, 1));
+        when(workoutService.startActiveTrainingDay(TEST_TELEGRAM_ID)).thenReturn(exerciseView());
 
         SendMessage response = handler.handle(update);
 
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Program \"Strength\" started");
-        assertThat(response.getText()).contains("Week 1 is now active: Upper Body");
-        assertThat(response.getText()).contains("/active_day");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("<b>Strength</b> started");
+        assertThat(response.getText()).contains("🔥 <b>Bench Press</b>");
+        assertThat(response.getText()).contains("Set 1/3 → <b>8 reps @ RPE 7</b>");
+        assertThat(response.getText()).contains("Load for set 1");
+        assertThat(response.getText()).doesNotContain("/active_day");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
+        assertThat(markup.getKeyboard().getFirst().getFirst().getCallbackData())
+                .isNotEqualTo(WorkoutMessageFormatter.START_ACTIVE_DAY_CALLBACK);
+        assertThat(markup.getKeyboard().getFirst().getFirst().getCallbackData())
+                .isEqualTo(WorkoutMessageFormatter.NO_LOAD_CALLBACK);
+        verify(workoutService).startActiveTrainingDay(TEST_TELEGRAM_ID);
     }
 
     @Test
@@ -69,6 +87,26 @@ class StartProgramCallbackHandlerTest {
         SendMessage response = handler.handle(update);
 
         assertThat(response.getText()).isEqualTo("Cannot start a program without training days.");
+        verifyNoInteractions(workoutService);
+    }
+
+    private WorkoutService.WorkoutExerciseView exerciseView() {
+        return new WorkoutService.WorkoutExerciseView(
+                100L,
+                "Upper Body",
+                "Bench Press",
+                1,
+                1,
+                1,
+                3,
+                false,
+                "8",
+                "RPE 7",
+                List.of("https://video.example/bench"),
+                null,
+                null,
+                List.of()
+        );
     }
 
     private Update createUpdate(String callbackData) {

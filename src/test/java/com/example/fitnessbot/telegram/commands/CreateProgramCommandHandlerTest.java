@@ -86,6 +86,7 @@ class CreateProgramCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("Program draft created: \"My Awesome Program\"");
+        assertThat(response.getText()).contains("Send or forward the training day messages");
         assertThat(response.getText()).contains("tap \"Finish Program\" or send /finish_program");
 
         verify(programService).startProgramCreation(TEST_USER_ID, "My Awesome Program");

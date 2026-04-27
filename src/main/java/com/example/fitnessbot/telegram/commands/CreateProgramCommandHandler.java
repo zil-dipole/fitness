@@ -86,7 +86,7 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
             response.setText("✅ Program draft created: \"" + program.getName() + "\"\n\n" +
-                    "Forward the training day messages you want to include.\n" +
+                    "Send or forward the training day messages you want to include.\n" +
                     "When you're done, tap \"Finish Program\" or send /finish_program.");
             response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
             return response;

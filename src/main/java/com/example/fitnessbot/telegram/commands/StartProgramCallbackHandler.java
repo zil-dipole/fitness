@@ -1,7 +1,9 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.exception.ProgramException;
+import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.WorkoutService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -13,9 +15,11 @@ public class StartProgramCallbackHandler implements CallbackQueryHandler {
     private static final String CALLBACK_PREFIX = "start_program:";
 
     private final ProgramService programService;
+    private final WorkoutService workoutService;
 
-    public StartProgramCallbackHandler(ProgramService programService) {
+    public StartProgramCallbackHandler(ProgramService programService, WorkoutService workoutService) {
         this.programService = programService;
+        this.workoutService = workoutService;
     }
 
     @Override
@@ -40,10 +44,12 @@ public class StartProgramCallbackHandler implements CallbackQueryHandler {
         try {
             ProgramService.ActiveProgramSelection selection =
                     programService.startProgramForUser(programId, callbackQuery.getFrom().getId());
-            response.setText("✅ Program \"" + selection.program().getName() + "\" started.\n"
-                    + "Week " + selection.weekNumber() + " is now active: " + selection.trainingDay().getTitle() + "\n\n"
-                    + "Send /active_day to view it.");
-        } catch (ProgramException e) {
+            WorkoutService.WorkoutExerciseView view = workoutService.startActiveTrainingDay(callbackQuery.getFrom().getId());
+            response.setText("✅ <b>" + TrainingDayMessageFormatter.escapeHtml(selection.program().getName())
+                    + "</b> started\n" + WorkoutMessageFormatter.formatExerciseView(view));
+            response.setParseMode("HTML");
+            response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard(view));
+        } catch (ProgramException | WorkoutException e) {
             response.setText(e.getMessage());
         }
 

@@ -349,7 +349,7 @@ class TelegramUiInteractionTest {
 
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
-                        && message.getText().contains("Forward another day, or tap \"Finish Program\"")
+                        && message.getText().contains("Send or forward another day, or tap \"Finish Program\"")
                         && message.getText().contains("Finish Program")
                         && message.getReplyMarkup() instanceof InlineKeyboardMarkup
         ));
@@ -388,11 +388,41 @@ class TelegramUiInteractionTest {
 
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
-                        && message.getText().contains("Forward another day, or tap \"Finish Program\"")
+                        && message.getText().contains("Send or forward another day, or tap \"Finish Program\"")
         ));
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
                         && message.getText().contains("Program \"My Program\" is ready.")
+        ));
+    }
+
+    @Test
+    void testProgramCreationAcceptsTypedTrainingDays() throws Exception {
+        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
+        program.setId(1L);
+        program.setName("Typed Program");
+        when(programService.startProgramCreation(USER_ID, "Typed Program")).thenReturn(program);
+        when(trainingDayService.processForwardedMessage(eq(USER_ID), anyString()))
+                .thenReturn(trainingDay(1L));
+
+        Update createUpdate = createMockUpdateWithCommand("/create_program Typed Program");
+        fitnessTelegramBot.onUpdateReceived(createUpdate);
+
+        Update typedTrainingDay = createMockUpdateWithCommand("Upper Body Day:\nBench press 3 x 8");
+        fitnessTelegramBot.onUpdateReceived(typedTrainingDay);
+
+        verify(trainingDayService).processForwardedMessage(USER_ID, "Upper Body Day:\nBench press 3 x 8");
+        verify(workoutService, never()).hasWorkoutInputContext(USER_ID);
+        assertEquals(1, sessionManager.getSession(USER_ID).getTrainingDaysCount());
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot, atLeastOnce()).sendTelegramMessage(captor.capture());
+
+        assertTrue(captor.getAllValues().stream().anyMatch(message ->
+                message.getText() != null
+                        && message.getText().contains("Added")
+                        && message.getText().contains("Send or forward another day")
+                        && message.getReplyMarkup() instanceof InlineKeyboardMarkup
         ));
     }
 

@@ -78,6 +78,17 @@ Build the service image locally with Maven/Jib and push it to Docker Hub:
 deploy/build-push-image.sh
 ```
 
+If Jib cannot reuse your local Docker Desktop credentials cleanly, provide registry auth explicitly with environment variables before building:
+
+```bash
+export JIB_FROM_USERNAME="<dockerhub-username>"
+export JIB_FROM_PASSWORD="<dockerhub-token>"
+export JIB_TO_USERNAME="<dockerhub-username>"
+export JIB_TO_PASSWORD="<dockerhub-token>"
+```
+
+For the current setup, both the base image and the target image are on Docker Hub, so the same Docker Hub username and token can be used for both `from` and `to`.
+
 The default image tag is `YYYYMMDD-<git-sha>`, and secrets from `deploy/.env` are not included in the image. Use `deploy/build-push-image.sh --update-env` to write the produced image tag to local `deploy/.env` as `APP_IMAGE`.
 
 Build, push, and deploy to the Raspberry Pi with one command:

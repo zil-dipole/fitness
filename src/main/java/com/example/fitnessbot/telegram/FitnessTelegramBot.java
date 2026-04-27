@@ -318,14 +318,16 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleForwardedMessageDuringProgramCreation(Update update) {
+        handleTrainingDayMessageDuringProgramCreation(update);
+    }
+
+    private void handleTrainingDayMessageDuringProgramCreation(Update update) {
         Long userId = update.getMessage().getFrom().getId();
         String messageText = update.getMessage().getText();
 
         try {
-            // Process the training day normally
             TrainingDay trainingDay = trainingDayService.processForwardedMessage(userId, messageText);
 
-            // Add it to the program creation session
             var session = sessionManager.getSession(userId);
             session.addTrainingDay(trainingDay);
 
@@ -338,10 +340,22 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     session.getTrainingDaysCount() + " training " +
                     (session.getTrainingDaysCount() == 1 ? "day" : "days") +
                     " in this draft.\n\n" +
-                    "Forward another day, or tap \"Finish Program\" when you're done.");
+                    "Send or forward another day, or tap \"Finish Program\" when you're done.");
             sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
 
             sendTelegramMessage(sendMessage);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid training day input during program creation for user {}: {}", userId, e.getMessage());
+
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(update.getMessage().getChatId().toString());
+            sendMessage.setText("❌ I couldn't use that training day.\n" + e.getMessage());
+
+            try {
+                sendTelegramMessage(sendMessage);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send error message to user", telegramApiException);
+            }
         } catch (TrainingDayException e) {
             log.warn("Parser error during program creation for user {}: {}", userId, e.getMessage());
 
@@ -371,6 +385,11 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private void handlePlainTextMessage(Update update) {
         Long userId = update.getMessage().getFrom().getId();
+        if (sessionManager.hasActiveSession(userId)) {
+            handleTrainingDayMessageDuringProgramCreation(update);
+            return;
+        }
+
         if (!workoutService.hasWorkoutInputContext(userId)) {
             return;
         }
