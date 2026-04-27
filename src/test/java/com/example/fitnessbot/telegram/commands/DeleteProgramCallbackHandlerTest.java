@@ -50,7 +50,7 @@ class DeleteProgramCallbackHandlerTest {
         SendMessage response = handler.handle(update);
 
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).isEqualTo("Program deleted.");
+        assertThat(response.getText()).isEqualTo("✅ Program deleted.");
         assertThat(response.getReplyMarkup()).isNotNull();
     }
 
@@ -61,7 +61,7 @@ class DeleteProgramCallbackHandlerTest {
 
         SendMessage response = handler.handle(update);
 
-        assertThat(response.getText()).isEqualTo("Program not found.");
+        assertThat(response.getText()).isEqualTo("I couldn't find that program.");
     }
 
     private Update createUpdate(String callbackData) {

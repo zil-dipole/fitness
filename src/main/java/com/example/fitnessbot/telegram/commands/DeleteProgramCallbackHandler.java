@@ -41,10 +41,10 @@ public class DeleteProgramCallbackHandler implements CallbackQueryHandler {
 
         boolean deleted = programService.deleteProgramForUser(programId, callbackQuery.getFrom().getId());
         if (deleted) {
-            response.setText("Program deleted.");
+            response.setText("✅ Program deleted.");
             response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
         } else {
-            response.setText("Program not found.");
+            response.setText("I couldn't find that program.");
         }
 
         return response;

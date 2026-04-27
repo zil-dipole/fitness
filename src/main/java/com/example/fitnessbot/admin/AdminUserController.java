@@ -29,12 +29,12 @@ public class AdminUserController {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found for telegramId=" + telegramUserId));
 
-        user.setUseAiParser(request.enabled());
+        user.setUseAiParser(request.useAiParser());
         User savedUser = userRepository.save(user);
         return new ParserFlagResponse(savedUser.getTelegramId(), savedUser.isUseAiParser());
     }
 
-    public record ParserFlagRequest(boolean enabled) {
+    public record ParserFlagRequest(boolean useAiParser) {
     }
 
     public record ParserFlagResponse(Long telegramUserId, boolean useAiParser) {

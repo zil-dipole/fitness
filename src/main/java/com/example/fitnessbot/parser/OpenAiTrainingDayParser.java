@@ -166,7 +166,7 @@ public class OpenAiTrainingDayParser {
             return emptyTrainingDay();
         }
         if (!StringUtils.hasText(apiKey)) {
-            throw new TrainingDayException("AI parser is enabled for the user, but no API key is configured. Set OPENAI_API_KEY or NEBIUS_API_KEY");
+            throw new TrainingDayException("AI parser is useAiParser for the user, but no API key is configured. Set OPENAI_API_KEY or NEBIUS_API_KEY");
         }
 
         String jsonPayload = usesChatCompletionsFirst()

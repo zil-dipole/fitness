@@ -154,68 +154,21 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     acknowledgeCallbackQuery(callbackQuery, null);
                     return;
                 case "cancel_program":
-                    Long userId = callbackQuery.getFrom().getId();
-                    if (sessionManager.hasActiveSession(userId)) {
-                        sessionManager.endSession(userId);
-                        message.setText("✅ Program creation cancelled.");
-                        // Send updated menu after cancelling
-                        message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
-                    } else {
-                        message.setText("You don't have an active program creation session to cancel.");
-                    }
-                    break;
+                    handleCommandCallback(callbackQuery, "/cancel_program");
+                    acknowledgeCallbackQuery(callbackQuery, null);
+                    return;
                 case "finish_program":
-                    Long finishUserId = callbackQuery.getFrom().getId();
-                    if (sessionManager.hasActiveSession(finishUserId)) {
-                        // Create a fake update to simulate the /finish_program command being sent
-                        Update fakeUpdate = new Update();
-                        org.telegram.telegrambots.meta.api.objects.Message fakeMessage = new org.telegram.telegrambots.meta.api.objects.Message();
-                        fakeMessage.setText("/finish_program");
-
-                        if (callbackQuery.getMessage() instanceof org.telegram.telegrambots.meta.api.objects.Message originalMessage) {
-                            fakeMessage.setChat(originalMessage.getChat());
-                        }
-
-                        fakeMessage.setFrom(callbackQuery.getFrom());
-                        fakeUpdate.setMessage(fakeMessage);
-                        fakeUpdate.setUpdateId(1); // Set a dummy update ID
-
-                        // Handle the command
-                        handleCommand(fakeUpdate);
-                        
-                        // Return early since we've handled the command
-                        return;
-                    } else {
-                        message.setText("You don't have an active program creation session. Start one with /create_program <program_name>");
-                    }
-                    break;
+                    handleCommandCallback(callbackQuery, "/finish_program");
+                    acknowledgeCallbackQuery(callbackQuery, null);
+                    return;
                 case "help":
-                    message.setText("""
-                            Simply forward your workout program messages to me and I'll parse and save them.
-
-                            Supported format:
-                            - Section headers ending with ':'
-                            - Exercises with bullet points ('⁃' or '-')
-                            - Sets and reps like "3 x 10"
-                            - Video links
-
-                            Program Creation Commands:
-                            - /create_program <name> - Start creating a new program
-                            - Forward training day messages to add them to the program
-                            - /finish_program - Finish and save the program
-                            - /cancel_program - Cancel program creation
-
-                            Example:
-                            Upper Body:
-                            - Bench Press 3 x 10 (Warm up set)
-                            - https://youtube.com/watch?v=example""");
-                    // Add menu keyboard to help message
-                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
-                    break;
+                    handleCommandCallback(callbackQuery, "/help");
+                    acknowledgeCallbackQuery(callbackQuery, null);
+                    return;
                 case "start_menu":
-                    message.setText("Welcome to Fitness Bot! Choose an option below:");
-                    message.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(callbackQuery.getFrom().getId()));
-                    break;
+                    handleCommandCallback(callbackQuery, "/menu");
+                    acknowledgeCallbackQuery(callbackQuery, null);
+                    return;
                 default:
                     // Handle command suggestions (new functionality)
                     if (callbackData.startsWith("show_program:")) {
@@ -226,7 +179,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                         handleCommandSuggestion(callbackQuery);
                         return; // We've handled the callback, so we can return early
                     } else {
-                        message.setText("Unknown button action. Please try again.");
+                        message.setText("I couldn't understand that button action. Please try again.");
                     }
                     break;
             }
@@ -308,8 +261,9 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("✅ Training program received and processed successfully! Saved " +
-                    trainingDay.getExercises().size() + " exercises.");
+            sendMessage.setText("✅ Training day saved.\n" +
+                    "Parsed " + trainingDay.getExercises().size() + " exercise" +
+                    (trainingDay.getExercises().size() == 1 ? "" : "s") + ".");
 
             sendTelegramMessage(sendMessage);
         } catch (IllegalArgumentException e) {
@@ -317,7 +271,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Invalid input: " + e.getMessage());
+            sendMessage.setText("❌ I couldn't use that message.\n" + e.getMessage());
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -329,7 +283,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Sorry, the training day parser failed: " + e.getMessage());
+            sendMessage.setText("❌ I couldn't parse that training day.\n" + e.getMessage());
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -341,7 +295,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Sorry, there was a database error processing your training program. Please try again.");
+            sendMessage.setText("❌ I couldn't save that training day because of a database error.\nPlease try again.");
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -353,7 +307,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Sorry, there was an unexpected error processing your training program. Please try again.");
+            sendMessage.setText("❌ Something went wrong while saving that training day.\nPlease try again.");
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -377,9 +331,14 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("✅ Training day added to your program! (Total: " +
-                               session.getTrainingDaysCount() + " days)\n" +
-                               "When you're done, press the \"Finish Program\" button or send /finish_program.");
+            String trainingDayTitle = trainingDay.getTitle() == null || trainingDay.getTitle().isBlank()
+                    ? "Training day"
+                    : "\"" + trainingDay.getTitle().trim() + "\"";
+            sendMessage.setText("✅ Added " + trainingDayTitle + " to \"" + session.getProgram().getName() + "\".\n" +
+                    session.getTrainingDaysCount() + " training " +
+                    (session.getTrainingDaysCount() == 1 ? "day" : "days") +
+                    " in this draft.\n\n" +
+                    "Forward another day, or tap \"Finish Program\" when you're done.");
             sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
 
             sendTelegramMessage(sendMessage);
@@ -388,7 +347,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Sorry, the training day parser failed: " + e.getMessage());
+            sendMessage.setText("❌ I couldn't parse that training day.\n" + e.getMessage());
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -400,7 +359,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Sorry, there was an error adding this training day to your program. Please try again.");
+            sendMessage.setText("❌ I couldn't add that training day to your draft.\nPlease try again.");
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -496,7 +455,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             } else {
                 response = new SendMessage();
                 response.setChatId(update.getMessage().getChatId().toString());
-                response.setText("Unknown command. Send /help for usage instructions.");
+                response.setText("I don't recognize that command.\n\nSend /help to see what I can do.");
             }
 
             if (response != null) {
@@ -508,7 +467,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             try {
                 SendMessage errorMessage = new SendMessage();
                 errorMessage.setChatId(update.getMessage().getChatId().toString());
-                errorMessage.setText("Sorry, there was an error processing your command.");
+                errorMessage.setText("I couldn't process that command.\nPlease try again.");
                 sendTelegramMessage(errorMessage);
             } catch (Exception telegramApiException) {
                 log.error("Failed to send error message to user", telegramApiException);
@@ -523,7 +482,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         Long userId = update.getMessage().getFrom().getId();
         SendMessage message = new SendMessage();
         message.setChatId(update.getMessage().getChatId().toString());
-        message.setText("📋 Available commands:");
+        message.setText("Choose a command:");
 
         // Filter commands to only include available commands for context-aware handlers
         List<CommandMetadata> availableCommands = commandRegistryService.getAllCommands().stream()
@@ -561,7 +520,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         if (!suggestions.isEmpty()) {
             SendMessage message = new SendMessage();
             message.setChatId(update.getMessage().getChatId().toString());
-            message.setText("❓ Did you mean one of these commands?");
+            message.setText("Did you mean one of these commands?");
 
             // Create inline keyboard with suggested commands
             InlineKeyboardMarkup markup = createCommandKeyboard(suggestions);
@@ -576,7 +535,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             // No suggestions, send unknown command message
             SendMessage message = new SendMessage();
             message.setChatId(update.getMessage().getChatId().toString());
-            message.setText("Unknown command. Send /help for usage instructions.");
+            message.setText("I don't recognize that command.\n\nSend /help to see what I can do.");
 
             try {
                 sendTelegramMessage(message);

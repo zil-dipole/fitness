@@ -36,7 +36,7 @@ class AdminUserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "enabled": true
+                                  "useAiParser": true
                                 }
                                 """))
                 .andExpect(status().isUnauthorized());
@@ -56,7 +56,7 @@ class AdminUserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "enabled": true
+                                  "useAiParser": true
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -75,7 +75,7 @@ class AdminUserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "enabled": false
+                                  "useAiParser": false
                                 }
                                 """))
                 .andExpect(status().isNotFound());

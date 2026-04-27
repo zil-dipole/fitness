@@ -241,7 +241,7 @@ class TelegramUiInteractionTest {
 
         SendMessage sentMessage = captor5.getValue();
         assertNotNull(sentMessage);
-        assertTrue(sentMessage.getText().contains("Supported format"));
+        assertTrue(sentMessage.getText().contains("Message format I can read"));
     }
 
     @Test
@@ -259,7 +259,7 @@ class TelegramUiInteractionTest {
 
         SendMessage sentMessage = captor6.getValue();
         assertNotNull(sentMessage);
-        assertTrue(sentMessage.getText().contains("Started creating program"));
+        assertTrue(sentMessage.getText().contains("Program draft created"));
         assertTrue(sentMessage.getText().contains("My Program"));
         assertTrue(sessionManager.hasActiveSession(USER_ID));
     }
@@ -279,7 +279,7 @@ class TelegramUiInteractionTest {
 
         SendMessage sentMessage = captor.getValue();
         assertNotNull(sentMessage);
-        assertTrue(sentMessage.getText().contains("Your saved programs"));
+        assertTrue(sentMessage.getText().contains("Your Saved Programs"));
         assertTrue(sentMessage.getText().contains("#1 Strength"));
         assertTrue(sentMessage.getReplyMarkup() instanceof InlineKeyboardMarkup);
     }
@@ -308,7 +308,7 @@ class TelegramUiInteractionTest {
 
         SendMessage sentMessage = captor.getValue();
         assertNotNull(sentMessage);
-        assertTrue(sentMessage.getText().contains("Program: Strength"));
+        assertTrue(sentMessage.getText().contains("Strength"));
         assertTrue(sentMessage.getText().contains("1. Upper Body"));
     }
 
@@ -349,9 +349,8 @@ class TelegramUiInteractionTest {
 
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
-                        && message.getText().contains("Training day added to your program!")
+                        && message.getText().contains("Forward another day, or tap \"Finish Program\"")
                         && message.getText().contains("Finish Program")
-                        && message.getText().contains("/finish_program")
                         && message.getReplyMarkup() instanceof InlineKeyboardMarkup
         ));
     }
@@ -389,11 +388,11 @@ class TelegramUiInteractionTest {
 
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
-                        && message.getText().contains("Training day added to your program!")
+                        && message.getText().contains("Forward another day, or tap \"Finish Program\"")
         ));
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
-                        && message.getText().contains("Program \"My Program\" created successfully!")
+                        && message.getText().contains("Program \"My Program\" is ready.")
         ));
     }
 

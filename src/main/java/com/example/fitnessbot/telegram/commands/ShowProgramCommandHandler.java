@@ -45,7 +45,7 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        sendMessage.setText("You don't have an active program creation session. Start one with /create_program <name>");
+        sendMessage.setText("Use /show_program to view saved programs or /create_program <name> to start a new one.");
         return sendMessage;
     }
 
@@ -62,7 +62,7 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
             return buildSavedProgramDetails(sendMessage, telegramUserId, requestedProgramId);
         }
         if (hasInvalidProgramId(selector)) {
-            sendMessage.setText("Invalid program ID. Use /show_program <program_id>.");
+            sendMessage.setText("Invalid program ID.\n\nUse /show_program <program_id>.");
             return sendMessage;
         }
         if (selector != null) {
@@ -75,27 +75,30 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         var session = sessionManager.getSession(telegramUserId);
         if (session != null) {
             Program program = session.getProgram();
-            response.append("<b>Program Creation Session: ")
+            response.append("<b>Program Draft</b>\n")
                     .append(TrainingDayMessageFormatter.escapeHtml(program.getName()))
                     .append("</b>\n\n");
-            
-            // Get training days from the session
+
             List<TrainingDay> trainingDays = session.getTrainingDays();
             if (!trainingDays.isEmpty()) {
-                response.append("Training Days Added:\n");
-                
+                response.append("<b>Training days added</b>\n");
                 for (TrainingDay trainingDay : trainingDays) {
-                    response.append("- ")
+                    response.append("• ")
                             .append(TrainingDayMessageFormatter.escapeHtml(trainingDay.getTitle()))
                             .append("\n");
                 }
-                
-                response.append("\nTotal: ").append(trainingDays.size()).append(" training days");
+
+                response.append("\n")
+                        .append(trainingDays.size())
+                        .append(" training ")
+                        .append(trainingDays.size() == 1 ? "day" : "days")
+                        .append(" so far.\n");
+                response.append("Forward another training day, or tap Finish Program when you're done.");
             } else {
                 response.append("No training days added yet.\n");
-                response.append("Forward training day messages to add them to this program.");
+                response.append("Forward a training day message to start building this program.");
             }
-            
+
             sendMessage.setParseMode("HTML");
         } else {
             return buildSavedProgramList(sendMessage, telegramUserId);
@@ -118,22 +121,24 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
     private SendMessage buildSavedProgramList(SendMessage sendMessage, Long telegramUserId) {
         List<Program> programs = programService.getProgramsForUser(telegramUserId);
         if (programs.isEmpty()) {
-            sendMessage.setText("You don't have any saved programs yet. Create one with /create_program <name>.");
+            sendMessage.setText("You don't have any saved programs yet.\n\nUse /create_program <name> to create your first one.");
             return sendMessage;
         }
 
-        StringBuilder response = new StringBuilder("Your saved programs:\n\n");
+        StringBuilder response = new StringBuilder("<b>Your Saved Programs</b>\n\n");
         for (Program program : programs) {
-            response.append("- #")
+            response.append("• #")
                     .append(program.getId())
                     .append(" ")
-                    .append(program.getName())
+                    .append(TrainingDayMessageFormatter.escapeHtml(program.getName()))
                     .append("\n");
         }
-        response.append("\nUse the number after # to open a program, for example: /show_program ")
-                .append(programs.get(0).getId());
+        response.append("\nOpen one with the buttons below or send <code>/show_program ")
+                .append(programs.getFirst().getId())
+                .append("</code>.");
 
         sendMessage.setText(response.toString());
+        sendMessage.setParseMode("HTML");
         sendMessage.setReplyMarkup(createProgramButtons(programs));
         return sendMessage;
     }
@@ -141,7 +146,7 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
     private SendMessage buildSavedProgramDetails(SendMessage sendMessage, Long telegramUserId, Long programId) {
         Optional<Program> program = programService.getProgramForUser(programId, telegramUserId);
         if (program.isEmpty()) {
-            sendMessage.setText("Program not found.");
+            sendMessage.setText("I couldn't find that program.");
             return sendMessage;
         }
 
@@ -149,23 +154,31 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
                 programService.getProgramTrainingDaysForUser(programId, telegramUserId);
 
         StringBuilder response = new StringBuilder();
-        response.append("Program: ").append(program.get().getName()).append("\n\n");
+        response.append("<b>Program</b>\n")
+                .append(TrainingDayMessageFormatter.escapeHtml(program.get().getName()))
+                .append("\n\n");
 
         if (trainingDays.isEmpty()) {
             response.append("No training days are linked to this program yet.");
         } else {
-            response.append("Training days:\n");
+            response.append("<b>Training days</b>\n");
             for (com.example.fitnessbot.model.ProgramTrainingDay programTrainingDay : trainingDays) {
                 TrainingDay trainingDay = programTrainingDay.getTrainingDay();
                 response.append(programTrainingDay.getPosition())
                         .append(". ")
-                        .append(trainingDay.getTitle())
+                        .append(TrainingDayMessageFormatter.escapeHtml(trainingDay.getTitle()))
                         .append("\n");
             }
-            response.append("\nTotal: ").append(trainingDays.size()).append(" training days");
+            response.append("\n")
+                    .append(trainingDays.size())
+                    .append(" training ")
+                    .append(trainingDays.size() == 1 ? "day" : "days")
+                    .append(" total.\n");
+            response.append("Tap Start Program when you're ready.");
         }
 
         sendMessage.setText(response.toString());
+        sendMessage.setParseMode("HTML");
         sendMessage.setReplyMarkup(createProgramDetailsButtons(programId, trainingDays));
         return sendMessage;
     }
@@ -176,11 +189,11 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
                 .toList();
 
         if (matches.isEmpty()) {
-            sendMessage.setText("Program not found. Send /show_program to see your saved programs.");
+            sendMessage.setText("I couldn't find that program.\n\nSend /show_program to see your saved programs.");
             return sendMessage;
         }
         if (matches.size() > 1) {
-            sendMessage.setText("Multiple programs named \"" + programName + "\" found. Choose one:");
+            sendMessage.setText("I found multiple programs named \"" + programName + "\".\n\nChoose the one you want to open:");
             sendMessage.setReplyMarkup(createProgramButtons(matches));
             return sendMessage;
         }

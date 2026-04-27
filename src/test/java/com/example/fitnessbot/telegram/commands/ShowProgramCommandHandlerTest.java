@@ -69,7 +69,7 @@ class ShowProgramCommandHandlerTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).isEqualTo("You don't have an active program creation session. Start one with /create_program <name>");
+        assertThat(response.getText()).isEqualTo("Use /show_program to view saved programs or /create_program <name> to start a new one.");
         
         // Verify that no unexpected interactions occurred
         verifyNoMoreInteractions(sessionManager);
@@ -89,7 +89,7 @@ class ShowProgramCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("You don't have any saved programs yet");
-        assertThat(response.getParseMode()).isNull(); // No markdown for plain text
+        assertThat(response.getParseMode()).isNull();
         assertThat(response.getReplyMarkup()).isNull(); // No keyboard for this case
 
         // Verify interactions
@@ -120,10 +120,11 @@ class ShowProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Your saved programs:");
+        assertThat(response.getText()).contains("Your Saved Programs");
         assertThat(response.getText()).contains("#1 Strength");
         assertThat(response.getText()).contains("#2 Hypertrophy");
         assertThat(response.getText()).contains("/show_program 1");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
 
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
@@ -169,10 +170,12 @@ class ShowProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Program: Strength");
+        assertThat(response.getText()).contains("<b>Program</b>");
+        assertThat(response.getText()).contains("Strength");
         assertThat(response.getText()).contains("1. Upper Body");
         assertThat(response.getText()).contains("2. Lower Body");
-        assertThat(response.getText()).contains("Total: 2 training days");
+        assertThat(response.getText()).contains("2 training days total");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
 
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
@@ -205,7 +208,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).contains("Program: Strength");
+        assertThat(response.getText()).contains("Strength");
         assertThat(response.getText()).contains("No training days are linked");
 
         verifyNoInteractions(sessionManager);
@@ -231,7 +234,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).contains("Program: Strength Program");
+        assertThat(response.getText()).contains("Strength Program");
 
         verifyNoInteractions(sessionManager);
         verify(programService).getProgramsForUser(TEST_TELEGRAM_ID);
@@ -257,7 +260,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).contains("Program: 2024 Strength");
+        assertThat(response.getText()).contains("2024 Strength");
 
         verifyNoInteractions(sessionManager);
         verify(programService).getProgramsForUser(TEST_TELEGRAM_ID);
@@ -283,7 +286,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).contains("Program: 5 x 5");
+        assertThat(response.getText()).contains("5 x 5");
 
         verifyNoInteractions(sessionManager);
         verify(programService).getProgramsForUser(TEST_TELEGRAM_ID);
@@ -311,7 +314,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).contains("Multiple programs named \"My Program\" found");
+        assertThat(response.getText()).contains("I found multiple programs named \"My Program\"");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
 
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
@@ -334,7 +337,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).isEqualTo("Program not found.");
+        assertThat(response.getText()).isEqualTo("I couldn't find that program.");
 
         verifyNoInteractions(sessionManager);
         verify(programService).getProgramForUser(99L, TEST_TELEGRAM_ID);
@@ -351,7 +354,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).isEqualTo("Invalid program ID. Use /show_program <program_id>.");
+        assertThat(response.getText()).isEqualTo("Invalid program ID.\n\nUse /show_program <program_id>.");
 
         verifyNoInteractions(sessionManager, programService);
     }
@@ -367,7 +370,7 @@ class ShowProgramCommandHandlerTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getText()).isEqualTo("Program not found. Send /show_program to see your saved programs.");
+        assertThat(response.getText()).isEqualTo("I couldn't find that program.\n\nSend /show_program to see your saved programs.");
 
         verifyNoInteractions(sessionManager);
         verify(programService).getProgramsForUser(TEST_TELEGRAM_ID);
@@ -399,7 +402,8 @@ class ShowProgramCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getParseMode()).isEqualTo("HTML");
-        assertThat(response.getText()).contains("<b>Program Creation Session: My &lt;Workout&gt; &amp; Program</b>");
+        assertThat(response.getText()).contains("<b>Program Draft</b>");
+        assertThat(response.getText()).contains("My &lt;Workout&gt; &amp; Program");
         assertThat(response.getText()).contains("No training days added yet.");
 
         // Verify interactions
@@ -440,10 +444,11 @@ class ShowProgramCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getParseMode()).isEqualTo("HTML");
-        assertThat(response.getText()).contains("<b>Program Creation Session: My Workout Program</b>");
-        assertThat(response.getText()).contains("Training Days Added:");
-        assertThat(response.getText()).contains("- Upper &lt;Body&gt; &amp; Arms");
-        assertThat(response.getText()).contains("- Lower Body");
+        assertThat(response.getText()).contains("<b>Program Draft</b>");
+        assertThat(response.getText()).contains("My Workout Program");
+        assertThat(response.getText()).contains("<b>Training days added</b>");
+        assertThat(response.getText()).contains("• Upper &lt;Body&gt; &amp; Arms");
+        assertThat(response.getText()).contains("• Lower Body");
 
         // Verify interactions
         verify(sessionManager).getSession(TEST_TELEGRAM_ID);

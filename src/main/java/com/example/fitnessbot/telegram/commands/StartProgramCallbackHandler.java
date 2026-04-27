@@ -40,9 +40,9 @@ public class StartProgramCallbackHandler implements CallbackQueryHandler {
         try {
             ProgramService.ActiveProgramSelection selection =
                     programService.startProgramForUser(programId, callbackQuery.getFrom().getId());
-            response.setText("Started program \"" + selection.program().getName() + "\".\n"
-                    + "Week " + selection.weekNumber() + ", active training day: " + selection.trainingDay().getTitle() + "\n\n"
-                    + "Use /active_day to view it.");
+            response.setText("✅ Program \"" + selection.program().getName() + "\" started.\n"
+                    + "Week " + selection.weekNumber() + " is now active: " + selection.trainingDay().getTitle() + "\n\n"
+                    + "Send /active_day to view it.");
         } catch (ProgramException e) {
             response.setText(e.getMessage());
         }

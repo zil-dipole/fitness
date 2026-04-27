@@ -57,7 +57,7 @@ class CreateProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("You already have an active program creation session");
+        assertThat(response.getText()).contains("You already have a program draft in progress");
         
         verify(sessionManager).hasActiveSession(TEST_USER_ID);
         verifyNoMoreInteractions(programService, sessionManager);
@@ -85,8 +85,8 @@ class CreateProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Started creating program: \"My Awesome Program\"");
-        assertThat(response.getText()).contains("press the \"Finish Program\" button or send /finish_program");
+        assertThat(response.getText()).contains("Program draft created: \"My Awesome Program\"");
+        assertThat(response.getText()).contains("tap \"Finish Program\" or send /finish_program");
 
         verify(programService).startProgramCreation(TEST_USER_ID, "My Awesome Program");
         verify(sessionManager).startSession(TEST_USER_ID, program);
@@ -115,7 +115,7 @@ class CreateProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Started creating program: \"My Program\"");
+        assertThat(response.getText()).contains("Program draft created: \"My Program\"");
 
         verify(programService).startProgramCreation(TEST_USER_ID, "My Program");
         verify(sessionManager).startSession(TEST_USER_ID, program);

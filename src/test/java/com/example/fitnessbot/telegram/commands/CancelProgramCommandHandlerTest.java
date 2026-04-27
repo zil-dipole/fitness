@@ -58,7 +58,7 @@ class CancelProgramCommandHandlerTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).isEqualTo("You don't have an active program creation session to cancel.");
+        assertThat(response.getText()).isEqualTo("There isn't a program draft to cancel.");
         
         // Verify that no unexpected interactions occurred
         verifyNoMoreInteractions(sessionManager);
@@ -76,7 +76,7 @@ class CancelProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("You don't have an active program creation session to cancel");
+        assertThat(response.getText()).contains("There isn't a program draft to cancel");
         
         verify(sessionManager).hasActiveSession(TEST_TELEGRAM_ID);
         verifyNoMoreInteractions(sessionManager);
@@ -95,7 +95,7 @@ class CancelProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Program creation cancelled");
+        assertThat(response.getText()).contains("Program draft cancelled");
 
         verify(sessionManager).endSession(TEST_TELEGRAM_ID);
     }

@@ -33,11 +33,11 @@ public class ActiveDayCommandHandler implements CommandHandler {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
         if (activeTrainingDay == null) {
-            response.setText("You don't have an active program. Open a saved program and press Start Program.");
+            response.setText("You don't have an active program yet.\n\nOpen a saved program and tap Start Program.");
             return response;
         }
 
-        response.setText("Active training day (Week " + weekNumber + "):\n\n" + TrainingDayMessageFormatter.format(activeTrainingDay));
+        response.setText("Week " + weekNumber + " - Active training day:\n\n" + TrainingDayMessageFormatter.format(activeTrainingDay));
         response.setParseMode("HTML");
         response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard());
         return response;

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -35,34 +36,45 @@ public class HelpCommandHandler implements CommandHandler {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
 
-        // Build help text using command registry
         StringBuilder helpText = new StringBuilder();
-        helpText.append("Simply forward your workout program messages to me and I'll parse and save them.\n\n");
-        helpText.append("Supported format:\n");
-        helpText.append("- Section headers ending with ':'\n");
-        helpText.append("- Exercises with bullet points ('⁃' or '-')\n");
-        helpText.append("- Sets and reps like \"3 x 10\"\n");
-        helpText.append("- Video links\n\n");
+        helpText.append("<b>How it works</b>\n");
+        helpText.append("1. Start a program with <code>/create_program &lt;name&gt;</code> or use the menu.\n");
+        helpText.append("2. Forward each training day message you want to save.\n");
+        helpText.append("3. Finish the program, then open it any time from <code>/show_program</code>.\n\n");
 
-        helpText.append("Available Commands:\n");
-        List<CommandMetadata> commands = commandRegistryService.getAllCommands();
+        helpText.append("<b>Message format I can read</b>\n");
+        helpText.append("• Section headers ending with <code>:</code>\n");
+        helpText.append("• Exercise lines starting with <code>-</code> or <code>⁃</code>\n");
+        helpText.append("• Sets and reps like <code>3 x 10</code>\n");
+        helpText.append("• Video links on separate lines\n\n");
+
+        helpText.append("<b>Commands</b>\n");
+        List<CommandMetadata> commands = commandRegistryService.getAllCommands().stream()
+                .sorted(Comparator.comparing(CommandMetadata::getCommand))
+                .toList();
         for (CommandMetadata cmd : commands) {
-            helpText.append(String.format("- %s - %s\n", cmd.getCommand(), cmd.getDescription()));
+            helpText.append("• <b>")
+                    .append(TrainingDayMessageFormatter.escapeHtml(cmd.getCommand()))
+                    .append("</b> - ")
+                    .append(TrainingDayMessageFormatter.escapeHtml(cmd.getDescription()))
+                    .append("\n");
             if (cmd.getUsageExample() != null && !cmd.getUsageExample().isEmpty() &&
                 !cmd.getUsageExample().equals(cmd.getCommand())) {
-                helpText.append(String.format("  Example: %s\n", cmd.getUsageExample()));
+                helpText.append("  Example: <code>")
+                        .append(TrainingDayMessageFormatter.escapeHtml(cmd.getUsageExample()))
+                        .append("</code>\n");
             }
         }
 
-        helpText.append("\nTip: Type \"/\" to see all available commands or start typing a command for suggestions!\n\n");
-
-        helpText.append("Example program format:\n");
-        helpText.append("Upper Body:\n");
-        helpText.append("- Bench Press 3 x 10 (Warm up set)\n");
-        helpText.append("- https://youtube.com/watch?v=example");
+        helpText.append("\n<b>Example message</b>\n");
+        helpText.append("<pre>Upper Body:\n");
+        helpText.append("- Bench Press 3 x 10\n");
+        helpText.append("- Pull-Ups 3 x 8\n");
+        helpText.append("- https://youtube.com/watch?v=example</pre>\n");
+        helpText.append("Type <code>/</code> to see all available commands, or use <code>/menu</code> to return to the main actions.");
 
         sendMessage.setText(helpText.toString());
-        // Add menu keyboard to help message
+        sendMessage.setParseMode("HTML");
         sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(update.getMessage().getFrom().getId()));
         return sendMessage;
     }

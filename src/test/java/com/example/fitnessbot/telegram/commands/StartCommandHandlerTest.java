@@ -69,7 +69,7 @@ class StartCommandHandlerTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("You're already using the bot");
+        assertThat(response.getText()).contains("You're already set up");
     }
 
     @Test
@@ -89,7 +89,7 @@ class StartCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("Welcome to Fitness Bot");
-        assertThat(response.getText()).contains("Forward your workout programs");
+        assertThat(response.getText()).contains("Create a program or open a saved one");
 
         // Check that inline keyboard is present
         assertThat(response.getReplyMarkup()).isNotNull();

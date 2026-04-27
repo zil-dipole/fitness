@@ -55,8 +55,8 @@ class StartProgramCallbackHandlerTest {
         SendMessage response = handler.handle(update);
 
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Started program \"Strength\"");
-        assertThat(response.getText()).contains("Week 1, active training day: Upper Body");
+        assertThat(response.getText()).contains("Program \"Strength\" started");
+        assertThat(response.getText()).contains("Week 1 is now active: Upper Body");
         assertThat(response.getText()).contains("/active_day");
     }
 

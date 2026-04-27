@@ -47,7 +47,7 @@ class ActiveDayCommandHandlerTest {
 
         SendMessage response = handler.handle(update);
 
-        assertThat(response.getText()).contains("You don't have an active program");
+        assertThat(response.getText()).contains("You don't have an active program yet");
     }
 
     @Test
@@ -68,7 +68,7 @@ class ActiveDayCommandHandlerTest {
 
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getParseMode()).isEqualTo("HTML");
-        assertThat(response.getText()).contains("Active training day (Week 3):");
+        assertThat(response.getText()).contains("Week 3 - Active training day:");
         assertThat(response.getText()).contains("<blockquote>Upper &lt;Body&gt; &amp; Arms\nBench &amp; Row &gt; Press\nKeep elbows &lt; shoulders &amp; controlled</blockquote>");
         assertThat(response.getText()).contains("<b>Upper &lt;Body&gt; &amp; Arms</b>");
         assertThat(response.getText()).contains("Bench &amp; Row &gt; Press");

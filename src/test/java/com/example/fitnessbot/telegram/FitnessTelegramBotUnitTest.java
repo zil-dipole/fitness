@@ -124,7 +124,7 @@ class FitnessTelegramBotUnitTest {
 
         SendMessage message = new SendMessage();
         message.setChatId(CHAT_ID);
-        message.setText("Unknown command. Send /help for usage instructions.");
+        message.setText("I don't recognize that command.\n\nSend /help to see what I can do.");
         verify(fitnessTelegramBot).sendTelegramMessage(message);
     }
 

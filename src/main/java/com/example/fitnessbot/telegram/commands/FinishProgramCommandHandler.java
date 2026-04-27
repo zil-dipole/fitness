@@ -44,7 +44,7 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("You don't have an active program creation session. Start one with /create_program <program_name>");
+        response.setText("There isn't a program draft in progress.\n\nStart one with /create_program <program_name>.");
         return response;
     }
 
@@ -56,7 +56,7 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
         if (!sessionManager.hasActiveSession(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("You don't have an active program creation session. Start one with /create_program <program_name>");
+            response.setText("There isn't a program draft in progress.\n\nStart one with /create_program <program_name>.");
             return response;
         }
 
@@ -70,7 +70,7 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
             if (trainingDays.isEmpty()) {
                 SendMessage response = new SendMessage();
                 response.setChatId(update.getMessage().getChatId().toString());
-                response.setText("⚠️ No training days were added to your program. Please forward at least one training day message before finishing.");
+                response.setText("⚠️ Your program draft is empty.\n\nForward at least one training day before finishing.");
                 return response;
             }
 
@@ -85,9 +85,9 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
 
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("✅ Program \"" + program.getName() + "\" created successfully!\n" +
-                          "Added " + trainingDays.size() + " training days to the program.");
-            // Send updated menu after finishing program
+            response.setText("✅ Program \"" + program.getName() + "\" is ready.\n" +
+                    "Added " + trainingDays.size() + " training " + (trainingDays.size() == 1 ? "day" : "days") + ".\n\n" +
+                    "Use /show_program to open it.");
             response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
             return response;
         } catch (ProgramException | TrainingDayException e) {

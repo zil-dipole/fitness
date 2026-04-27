@@ -57,7 +57,7 @@ Update the parser flag for a Telegram user:
 curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" \
   -X PUT http://localhost:8080/admin/users/123456789/parser \
   -H "Content-Type: application/json" \
-  -d '{"enabled":true}'
+  -d '{"useAiParser":true}'
 ```
 
 ### Run Tests
@@ -69,6 +69,24 @@ mvn test
 ```
 
 This will run both unit tests and integration tests with Java 21.
+
+### Build And Push Docker Image
+
+Build the service image locally with Maven/Jib and push it to Docker Hub:
+
+```bash
+deploy/build-push-image.sh
+```
+
+The default image tag is `YYYYMMDD-<git-sha>`, and secrets from `deploy/.env` are not included in the image. Use `deploy/build-push-image.sh --update-env` to write the produced image tag to local `deploy/.env` as `APP_IMAGE`.
+
+Build, push, and deploy to the Raspberry Pi with one command:
+
+```bash
+deploy/deploy-raspberrypi.sh
+```
+
+The deployment script uses the same default tag format, writes the produced image ref into the remote `.env`, and pulls that exact image on the Pi.
 
 ## Development
 

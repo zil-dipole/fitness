@@ -44,7 +44,11 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("You already have an active program creation session. Please finish it first with /finish_program or cancel it with /cancel_program.");
+        response.setText("""
+                You already have a program draft in progress.
+
+                Finish it with /finish_program or cancel it with /cancel_program.
+                """);
         return response;
     }
 
@@ -57,7 +61,11 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
         if (sessionManager.hasActiveSession(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("You already have an active program creation session. Please finish it first with /finish_program or cancel it with /cancel_program.");
+            response.setText("""
+                    You already have a program draft in progress.
+
+                    Finish it with /finish_program or cancel it with /cancel_program.
+                    """);
             return response;
         }
 
@@ -77,10 +85,9 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
 
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("✅ Started creating program: \"" + programName + "\"\n\n" +
-                          "Now forward the training day messages you want to include in this program.\n" +
-                          "When you're done, press the \"Finish Program\" button or send /finish_program to complete the process.");
-            // Send updated menu after starting program
+            response.setText("✅ Program draft created: \"" + program.getName() + "\"\n\n" +
+                    "Forward the training day messages you want to include.\n" +
+                    "When you're done, tap \"Finish Program\" or send /finish_program.");
             response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
             return response;
         } catch (ProgramException e) {

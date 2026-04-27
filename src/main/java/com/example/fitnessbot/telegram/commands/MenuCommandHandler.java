@@ -29,7 +29,7 @@ public class MenuCommandHandler implements CommandHandler {
     public SendMessage handle(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        sendMessage.setText("Welcome to Fitness Bot! Choose an option below:");
+        sendMessage.setText("Choose what you'd like to do next:");
         sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(update.getMessage().getFrom().getId()));
         return sendMessage;
     }

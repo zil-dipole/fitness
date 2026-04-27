@@ -36,7 +36,7 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("You don't have an active program creation session to cancel.");
+        response.setText("There isn't a program draft to cancel.");
         return response;
     }
 
@@ -48,7 +48,7 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
         if (!sessionManager.hasActiveSession(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("You don't have an active program creation session to cancel.");
+            response.setText("There isn't a program draft to cancel.");
             return response;
         }
 
@@ -57,8 +57,7 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
 
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("✅ Program creation cancelled.");
-        // Send updated menu after cancelling program
+        response.setText("✅ Program draft cancelled.");
         response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
         return response;
     }

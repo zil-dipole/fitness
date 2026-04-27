@@ -1,0 +1,10 @@
+.git
+.idea
+.vscode
+.qwen
+.air
+target
+deploy/.env
+src/main/resources/application-with-creds.yml
+*.log
+.DS_Store
