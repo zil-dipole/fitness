@@ -1,5 +1,7 @@
 package com.example.fitnessbot.telegram.commands;
 
+import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.WorkoutService;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -32,6 +34,42 @@ public final class WorkoutMessageFormatter {
 
     public static String formatExerciseResult(String message, WorkoutService.WorkoutExerciseView view) {
         return formatResultMessage(message) + "\n" + formatExerciseView(view);
+    }
+
+    public static String formatFinishScreen(String completionMessage,
+                                            ProgramService.ActiveTrainingDayProgression progression) {
+        StringBuilder response = new StringBuilder();
+        boolean completedFiveWeeks = progression != null && progression.completedFiveWeeks();
+
+        if (completedFiveWeeks) {
+            response.append("🏁 <b>5 weeks completed</b>");
+        } else {
+            response.append("✅ <b>Training day complete</b>");
+        }
+
+        String result = cleanText(completionMessage);
+        if (result != null) {
+            response.append("\n")
+                    .append(TrainingDayMessageFormatter.escapeHtml(result));
+        }
+
+        if (completedFiveWeeks) {
+            response.append("\nYou completed 5 weeks of this program.");
+        }
+
+        if (progression == null || progression.trainingDay() == null) {
+            return response.toString();
+        }
+
+        response.append("\n\nNext: <b>")
+                .append(trainingDayTitle(progression.trainingDay()))
+                .append("</b>\n")
+                .append("Week ")
+                .append(progression.weekNumber())
+                .append(" is ready.\n")
+                .append("Tap Start Day when you're ready.");
+
+        return response.toString();
     }
 
     public static String formatExerciseView(WorkoutService.WorkoutExerciseView view) {
@@ -187,6 +225,14 @@ public final class WorkoutMessageFormatter {
             return "no load";
         }
         return TrainingDayMessageFormatter.escapeHtml(load);
+    }
+
+    private static String trainingDayTitle(TrainingDay trainingDay) {
+        String title = cleanText(trainingDay.getTitle());
+        if (title == null) {
+            return "Training day";
+        }
+        return TrainingDayMessageFormatter.escapeHtml(title);
     }
 
     private static String previousLoadForButton(WorkoutService.WorkoutExerciseView view) {

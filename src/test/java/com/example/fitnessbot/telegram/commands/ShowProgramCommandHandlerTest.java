@@ -17,6 +17,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -121,15 +122,17 @@ class ShowProgramCommandHandlerTest {
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("Your Saved Programs");
-        assertThat(response.getText()).contains("#1 Strength");
-        assertThat(response.getText()).contains("#2 Hypertrophy");
-        assertThat(response.getText()).contains("/show_program 1");
+        assertThat(response.getText()).contains("• Strength");
+        assertThat(response.getText()).contains("• Hypertrophy");
+        assertThat(response.getText()).contains("/show_program Strength");
+        assertThat(response.getText()).doesNotContain("#1 Strength");
+        assertThat(response.getText()).doesNotContain("#2 Hypertrophy");
         assertThat(response.getParseMode()).isEqualTo("HTML");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
 
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
         assertThat(markup.getKeyboard()).hasSize(2);
-        assertThat(markup.getKeyboard().get(0).get(0).getText()).isEqualTo("#1 Strength");
+        assertThat(markup.getKeyboard().get(0).get(0).getText()).isEqualTo("Strength");
         assertThat(markup.getKeyboard().get(0).get(0).getCallbackData()).isEqualTo("show_program:1");
 
         verify(sessionManager).getSession(TEST_TELEGRAM_ID);
@@ -303,10 +306,12 @@ class ShowProgramCommandHandlerTest {
         Program program1 = new Program();
         program1.setId(1L);
         program1.setName("My Program");
+        program1.setCreatedAt(LocalDateTime.of(2026, 4, 1, 8, 30));
 
         Program program2 = new Program();
         program2.setId(2L);
         program2.setName("My Program");
+        program2.setCreatedAt(LocalDateTime.of(2026, 4, 2, 18, 45));
 
         when(programService.getProgramsForUser(TEST_TELEGRAM_ID)).thenReturn(List.of(program1, program2));
 
@@ -320,6 +325,8 @@ class ShowProgramCommandHandlerTest {
 
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
         assertThat(markup.getKeyboard()).hasSize(2);
+        assertThat(markup.getKeyboard().get(0).get(0).getText()).isEqualTo("My Program (created 2026-04-01 08:30)");
+        assertThat(markup.getKeyboard().get(1).get(0).getText()).isEqualTo("My Program (created 2026-04-02 18:45)");
         assertThat(markup.getKeyboard().get(1).get(0).getCallbackData()).isEqualTo("show_program:2");
 
         verifyNoInteractions(sessionManager);

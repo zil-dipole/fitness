@@ -11,8 +11,12 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -22,6 +26,8 @@ import java.util.Optional;
 public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
     public static final String COMMAND = "/show_program";
+    private static final DateTimeFormatter PROGRAM_CREATED_AT_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
@@ -126,15 +132,14 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         }
 
         StringBuilder response = new StringBuilder("<b>Your Saved Programs</b>\n\n");
-        for (Program program : programs) {
-            response.append("• #")
-                    .append(program.getId())
-                    .append(" ")
-                    .append(TrainingDayMessageFormatter.escapeHtml(program.getName()))
+        List<String> programLabels = buildProgramLabels(programs);
+        for (String programLabel : programLabels) {
+            response.append("• ")
+                    .append(TrainingDayMessageFormatter.escapeHtml(programLabel))
                     .append("\n");
         }
         response.append("\nOpen one with the buttons below or send <code>/show_program ")
-                .append(programs.getFirst().getId())
+                .append(TrainingDayMessageFormatter.escapeHtml(getProgramDisplayName(programs.getFirst())))
                 .append("</code>.");
 
         sendMessage.setText(response.toString());
@@ -204,16 +209,64 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
     private InlineKeyboardMarkup createProgramButtons(List<Program> programs) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<String> programLabels = buildProgramLabels(programs);
 
-        for (Program program : programs) {
+        for (int i = 0; i < programs.size(); i++) {
+            Program program = programs.get(i);
             InlineKeyboardButton button = new InlineKeyboardButton();
-            button.setText("#" + program.getId() + " " + program.getName());
+            button.setText(programLabels.get(i));
             button.setCallbackData("show_program:" + program.getId());
             rows.add(List.of(button));
         }
 
         markup.setKeyboard(rows);
         return markup;
+    }
+
+    private List<String> buildProgramLabels(List<Program> programs) {
+        Map<String, Integer> nameCounts = new HashMap<>();
+        for (Program program : programs) {
+            nameCounts.merge(normalizeProgramName(program.getName()), 1, Integer::sum);
+        }
+
+        Map<String, Integer> seenCounts = new HashMap<>();
+        List<String> labels = new ArrayList<>(programs.size());
+
+        for (Program program : programs) {
+            String normalizedName = normalizeProgramName(program.getName());
+            String displayName = getProgramDisplayName(program);
+            if (nameCounts.getOrDefault(normalizedName, 0) == 1) {
+                labels.add(displayName);
+                continue;
+            }
+
+            int occurrence = seenCounts.merge(normalizedName, 1, Integer::sum);
+            labels.add(displayName + " (" + buildProgramDisambiguator(program, occurrence) + ")");
+        }
+
+        return labels;
+    }
+
+    private String buildProgramDisambiguator(Program program, int occurrence) {
+        if (program.getCreatedAt() != null) {
+            return "created " + program.getCreatedAt().format(PROGRAM_CREATED_AT_FORMATTER);
+        }
+        return "option " + occurrence;
+    }
+
+    private String getProgramDisplayName(Program program) {
+        String name = program.getName();
+        if (name == null || name.trim().isEmpty()) {
+            return "Untitled Program";
+        }
+        return name.trim();
+    }
+
+    private String normalizeProgramName(String programName) {
+        if (programName == null) {
+            return "";
+        }
+        return programName.trim().toLowerCase(Locale.ROOT);
     }
 
     private InlineKeyboardMarkup createProgramDetailsButtons(

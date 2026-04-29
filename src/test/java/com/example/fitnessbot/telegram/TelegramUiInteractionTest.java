@@ -284,7 +284,8 @@ class TelegramUiInteractionTest {
         SendMessage sentMessage = captor.getValue();
         assertNotNull(sentMessage);
         assertTrue(sentMessage.getText().contains("Your Saved Programs"));
-        assertTrue(sentMessage.getText().contains("#1 Strength"));
+        assertTrue(sentMessage.getText().contains("Strength"));
+        assertFalse(sentMessage.getText().contains("#1 Strength"));
         assertTrue(sentMessage.getReplyMarkup() instanceof InlineKeyboardMarkup);
     }
 

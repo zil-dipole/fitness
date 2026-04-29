@@ -149,9 +149,13 @@ class WorkoutCallbackHandlerTest {
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.FINISH_WORKOUT_CALLBACK));
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("✅ <b>Training day complete</b>");
         assertThat(response.getText()).contains("Training day finished.");
-        assertThat(response.getText()).contains("Next active training day (Week 2):");
-        assertThat(response.getText()).contains("Lower Body");
+        assertThat(response.getText()).contains("Next: <b>Lower Body</b>");
+        assertThat(response.getText()).contains("Week 2 is ready.");
+        assertThat(response.getText()).contains("Tap Start Day when you're ready.");
+        assertThat(response.getText()).doesNotContain("Exercises:");
+        assertThat(response.getText()).doesNotContain("Squat");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
@@ -164,9 +168,11 @@ class WorkoutCallbackHandlerTest {
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("✅ <b>Training day complete</b>");
         assertThat(response.getText()).contains("Saved set 3: Grey green band. Training day completed.");
-        assertThat(response.getText()).contains("Next active training day (Week 2):");
-        assertThat(response.getText()).contains("Lower Body");
+        assertThat(response.getText()).contains("Next: <b>Lower Body</b>");
+        assertThat(response.getText()).contains("Week 2 is ready.");
+        assertThat(response.getText()).doesNotContain("Exercises:");
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
@@ -178,8 +184,26 @@ class WorkoutCallbackHandlerTest {
 
         SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
 
-        assertThat(response.getText()).contains("Next active training day (Week 6):");
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("🏁 <b>5 weeks completed</b>");
         assertThat(response.getText()).contains("You completed 5 weeks of this program.");
+        assertThat(response.getText()).contains("Next: <b>Lower Body</b>");
+        assertThat(response.getText()).contains("Week 6 is ready.");
+    }
+
+    @Test
+    void completedWorkoutResultShowsFinishScreenWithoutStartButtonWhenNoNextDay() throws Exception {
+        when(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"))
+                .thenReturn(new WorkoutService.WeightEntryResult(true, true, "Saved set 3: no load. Training day completed.", null));
+        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(null);
+
+        SendMessage response = handler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
+
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("✅ <b>Training day complete</b>");
+        assertThat(response.getText()).contains("Saved set 3: no load. Training day completed.");
+        assertThat(response.getText()).doesNotContain("Next:");
+        assertThat(response.getReplyMarkup()).isNull();
     }
 
     private WorkoutService.WorkoutExerciseView exerciseView() {

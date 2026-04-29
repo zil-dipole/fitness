@@ -1,7 +1,6 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.exception.WorkoutException;
-import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.WorkoutService;
 import org.springframework.stereotype.Component;
@@ -97,22 +96,10 @@ public class WorkoutCallbackHandler implements CallbackQueryHandler {
 
     private void appendNextTrainingDay(SendMessage response, Long telegramUserId, String completionMessage) {
         ProgramService.ActiveTrainingDayProgression progression = programService.advanceActiveTrainingDayForUser(telegramUserId);
-        if (progression == null || progression.trainingDay() == null) {
-            response.setText(completionMessage);
-            return;
-        }
-
-        StringBuilder text = new StringBuilder(completionMessage)
-                .append("\n\nNext active training day (Week ")
-                .append(progression.weekNumber())
-                .append("):\n\n")
-                .append(TrainingDayMessageFormatter.format(progression.trainingDay()));
-        if (progression.completedFiveWeeks()) {
-            text.append("\nYou completed 5 weeks of this program.");
-        }
-
-        response.setText(text.toString());
+        response.setText(WorkoutMessageFormatter.formatFinishScreen(completionMessage, progression));
         response.setParseMode("HTML");
-        response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard());
+        if (progression != null && progression.trainingDay() != null) {
+            response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard());
+        }
     }
 }

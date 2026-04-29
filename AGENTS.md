@@ -1,183 +1,240 @@
-# Fitness Bot - Development Context
+# Fitness Bot - Agent Context
 
-## Project Overview
+## Current Project State
 
-This is a Java-based Telegram bot application built with Spring Boot. Its primary purpose is to parse free-form fitness workout descriptions forwarded from Telegram messages, store them in a structured format, and later allow users to navigate through the exercises during their workout, log weights, and track progress.
+This is a Java 21 Spring Boot 3.3 Telegram bot for parsing workout programs, saving them as structured training days, starting active programs, walking users through workout days, and logging loads/history per exercise.
 
-The core functionality involves:
-- Receiving forwarded messages via a Telegram webhook.
-- Parsing the text content of these messages to extract workout routines (exercises, sets, reps, video links).
-- Storing the parsed data in a relational database (PostgreSQL).
-- Providing an interactive Telegram UI for users to step through exercises and log their performance.
+The bot uses Telegram long polling through `FitnessTelegramBot`; it is not a webhook-first app. It runs when `telegram.bot.token` is configured.
 
-Technologies used:
-- **Language**: Java 21
-- **Framework**: Spring Boot 3.3.0
-- **Database**: PostgreSQL (via Spring Data JPA)
-- **Messaging**: Telegram Bots API (using `telegrambots-spring-boot-starter`)
-- **Caching/Queue**: Redis
-- **Build Tool**: Maven
-- **Testing**: TestContainers for integration testing with PostgreSQL
+Primary runtime dependencies:
+- PostgreSQL for persistence.
+- Liquibase for schema migrations.
+- Redis for Spring data/health integration.
+- Telegram Bots API `telegrambots-spring-boot-starter`.
+- Optional OpenAI-compatible parser using `OPENAI_*` or `NEBIUS_*` environment variables.
+- Spring Security for the admin HTTP endpoint.
 
-### Architecture Summary
-The application follows a layered architecture:
-- **Controller Layer**: Handles incoming HTTP requests from Telegram webhooks.
-- **Service Layer**: Contains business logic, including parsing and persistence orchestration.
-- **Model Layer**: JPA Entities representing the data model (`User`, `TrainingDay`, `Exercise`).
-- **Parser Module**: A standalone component for converting unstructured text into structured objects.
-- **Repository Layer**: Spring Data JPA repositories for database access.
-- **Integration Testing**: TestContainers for testing with real PostgreSQL instances.
+## Build And Test Commands
 
-## Building, Running & Testing
+Use these from the repository root:
 
-### Prerequisites
-- JDK 21
-- Maven 3.6+
-- Docker (for TestContainers integration testing)
-- PostgreSQL database (for development - see Database Setup below)
-- Telegram Bot Token (for webhook setup)
-
-### Database Setup
-For local development, you need to have a PostgreSQL instance running. You can either:
-
-1. Install PostgreSQL locally and configure it with the credentials in `src/main/resources/application.yml`:
-   - Database: `fitness_bot`
-   - Username: `postgres`
-   - Password: `postgres`
-   - Host: `localhost`
-   - Port: `5432`
-
-2. Or modify the `src/main/resources/application.yml` file to use an embedded database like H2 for development:
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: password
-  jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
+```bash
+mvn test
 ```
 
-Don't forget to add the H2 dependency to your `pom.xml` if you choose this option:
+This is the default verification command. It runs unit tests and Docker/Testcontainers-backed integration tests. Docker must be running. Do not skip Docker-backed tests unless the user explicitly asks.
 
-```xml
-<dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <scope>runtime</scope>
-</dependency>
-```
-
-### Building the Application
 ```bash
 mvn clean package
 ```
 
-### Running the Application
+Builds the Spring Boot jar.
+
 ```bash
-# Ensure DATABASE_URL, REDIS_URL, TELEGRAM_BOT_TOKEN are set in environment
+docker-compose up -d
+```
+
+Starts local PostgreSQL and Redis for development. Local PostgreSQL is exposed on `localhost:5433`, Redis on `localhost:6379`.
+
+```bash
 mvn spring-boot:run
 ```
-or
+
+Runs the bot locally using `src/main/resources/application.yml` and environment variables.
+
+## Local Configuration
+
+Main config is in `src/main/resources/application.yml`.
+
+Important defaults:
+- `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/fitness_bot`
+- `SPRING_DATASOURCE_USERNAME=postgres`
+- `SPRING_DATASOURCE_PASSWORD=postgres`
+- `SPRING_DATA_REDIS_HOST=localhost`
+- `SPRING_DATA_REDIS_PORT=6379`
+- `SERVER_PORT=8080`
+- `TELEGRAM_BOT_USERNAME=zil_fit_bot`
+
+Required for a real bot run:
+- `TELEGRAM_BOT_TOKEN`
+
+AI parser configuration:
+- `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` take precedence.
+- `NEBIUS_API_KEY`, `NEBIUS_BASE_URL`, `NEBIUS_MODEL` are supported as fallback.
+
+Admin endpoint auth:
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+
+Do not commit or bake secrets into images. `src/main/resources/application-with-creds.yml` is explicitly excluded from packaged resources.
+
+## Deployment
+
+Deployment files are under `deploy/`.
+
+Production compose file:
+- `deploy/compose.yml`
+- Pulls the app image from `APP_IMAGE`.
+- Does not build the app on the server.
+- Uses Postgres and Redis containers.
+
+Build and push image locally with Maven/Jib:
+
 ```bash
-# After building
-java -jar target/fitness-bot-0.0.1-SNAPSHOT.jar
+deploy/build-push-image.sh
 ```
 
-### Running Tests
+Defaults:
+- repository: `mghostl/fitness-bot`
+- tag: `YYYYMMDD-<git-sha>`
+- platform: `linux/arm64`
+- runs `mvn test` before image build unless `--skip-tests`
+- pushes by default unless `--no-push`
+
+Deploy to Raspberry Pi in one command:
+
 ```bash
-# Run unit and integration tests with TestContainers
+deploy/deploy-raspberrypi.sh
+```
+
+Defaults:
+- remote: `lev@raspberrypi.local`
+- remote dir: `/opt/fitness-bot`
+- builds and pushes the image locally
+- writes the produced image ref into the effective remote `.env`
+- syncs only `deploy/` files to the remote host
+- pulls the exact app image on the host
+
+Useful variants:
+
+```bash
+deploy/deploy-raspberrypi.sh --skip-tests
+deploy/deploy-raspberrypi.sh --image mghostl/fitness-bot:20260427-ce2b2296dfe4
+deploy/deploy-raspberrypi.sh --no-build-image
+deploy/deploy-raspberrypi.sh --remote lev@rapsberrypi.local
+```
+
+`deploy/.env` contains local deployment secrets and must not be logged or committed. Use `deploy/.env.example` for shape/reference.
+
+If Docker Hub auth is needed for Jib, use:
+- `JIB_FROM_USERNAME`
+- `JIB_FROM_PASSWORD`
+- `JIB_TO_USERNAME`
+- `JIB_TO_PASSWORD`
+
+## Domain Model
+
+Core entities:
+- `User`: Telegram user, active program/day, parser preference.
+- `Program`: saved training program owned by a user.
+- `ProgramTrainingDay`: ordered link between program and training day.
+- `TrainingDay`: parsed workout day with raw text and exercises.
+- `Exercise`: parsed exercise, optional canonical exercise link, video URLs, last weight.
+- `WorkoutSession`: active/completed/abandoned workout session.
+- `WorkoutSetLog`: logged loads for exercise sets/rounds.
+
+Schema changes are managed by Liquibase changelogs in `src/main/resources/db/changelog/`.
+
+Do not rely on Hibernate auto-DDL. `spring.jpa.hibernate.ddl-auto` is `validate`.
+
+## Main Code Areas
+
+Application entry:
+- `src/main/java/com/example/fitnessbot/FitnessBotApplication.java`
+
+Telegram bot:
+- `telegram/FitnessTelegramBot.java`
+- `telegram/DefaultMenuKeyboardFactory.java`
+- `telegram/commands/*`
+
+Services:
+- `service/TrainingDayService.java`
+- `service/ProgramService.java`
+- `service/WorkoutService.java`
+- `service/ProgramCreationSessionManager.java`
+- `service/ProgramRenameSessionManager.java`
+
+Parsers:
+- `parser/TrainingDayParser.java`
+- `parser/OpenAiTrainingDayParser.java`
+- `parser/TrainingDayTitleNormalizer.java`
+
+Admin:
+- `admin/AdminUserController.java`
+- `admin/AdminSecurityConfig.java`
+
+Repositories:
+- `repository/*Repository.java`
+
+## Bot Behavior To Preserve
+
+Program creation:
+- `/create_program <name>` starts an in-memory draft session.
+- During a draft, users can send or forward training day text.
+- Each training day is parsed and added to the draft.
+- `/finish_program` saves links from the draft days into the program.
+- `/cancel_program` is only useful/visible when a draft exists.
+
+Program viewing:
+- `/show_program` lists saved programs with inline buttons.
+- `/show_program <id or name>` opens a program.
+- Numeric-leading names such as `2024 Strength` must be treatable as names unless the selector is explicitly numeric or `#123`.
+- Program detail UI includes start, rename, delete, and day buttons.
+
+Starting programs:
+- Tapping `Start Program` makes the program active, sets the first training day active, starts the workout day immediately, and shows the first exercise. Do not add an extra "Start Day" step here.
+
+Active workout day:
+- `/active_day` shows the active training day.
+- Workout input accepts numeric loads, custom load strings such as `orange band`, and `none`.
+- The UI can offer buttons for previous load and no load.
+- `none` is explicit; blank input is not accepted as no-load.
+- Exercise history should use canonical exercise linkage so history can span programs for the same user.
+- Circuit/round sections should progress round-by-round: A, B, C, then round 2 A, B, C, etc.
+
+Parser behavior:
+- `TrainingDayParser` is deterministic and handles common Telegram formats.
+- It supports bullet lists, numbered lists, inline video URLs, sets/reps, RPE/notes, compact pasted Telegram text with inline `⁃` bullets, and circuit section notes.
+- `OpenAiTrainingDayParser` is optional per user via `User.useAiParser`.
+- Admin endpoint can switch parser mode for a Telegram user:
+
+```bash
+curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" \
+  -X PUT http://localhost:8080/admin/users/123456789/parser \
+  -H "Content-Type: application/json" \
+  -d '{"useAiParser":true}'
+```
+
+## Testing Guidance
+
+Add or update tests for every behavior change.
+
+Common focused tests:
+
+```bash
+mvn -Dtest=TrainingDayParserTest test
+mvn -Dtest=WorkoutServiceTest test
+mvn -Dtest=ProgramServiceTest test
+mvn -Dtest=TelegramUiInteractionTest test
+mvn -Dtest=ShowProgramCommandHandlerTest test
+```
+
+Before finalizing changes, run:
+
+```bash
 mvn test
 ```
-The integration tests automatically start PostgreSQL containers using TestContainers, so Docker must be running.
-Test configurations are defined in `src/test/resources/application.properties`.
 
-### Development Requirements
-After each code change, ensure that:
+If tests fail, find and fix the root cause. Do not remove meaningful assertions just to make tests pass.
 
-1. The service can run successfully:
-   ```bash
-   mvn spring-boot:run
-   ```
+Avoid broad lenient Mockito stubs. Use precise stubs unless existing test setup forces leniency.
 
-2. All tests must pass before pushing changes:
-   ```bash
-   mvn test
-   ```
-   This includes both unit tests and integration tests with TestContainers. Docker must be running for integration tests.
+## Engineering Constraints
 
-3. For production builds:
-   ```bash
-   mvn clean package
-   ```
-
-## Development Conventions
-
-- **Package Structure**:
-  - `com.example.fitnessbot`: Root package.
-  - `.model`: JPA entities.
-  - `.repository`: Spring Data JPA repository interfaces.
-  - `.service`: Business logic services.
-  - `.parser`: Custom text parsing logic.
-  - `.controller`: REST controllers for handling Telegram webhooks (not yet present but implied).
-  - `.integration`: Integration tests using TestContainers.
-- **Coding Style**:
-  - Standard Java naming conventions.
-  - Explicit getters and setters instead of Lombok annotations (removed due to Java 17 compatibility issues).
-  - Entities use JPA annotations for ORM mapping.
-- **Testing**:
-  - Unit tests should reside in `src/test/java`.
-  - Integration tests involving databases use TestContainers and are located in the `.integration` package.
-  - Tests are annotated with `@SpringBootTest` and `@Testcontainers` for full Spring context loading.
-- **Configuration**:
-  - Externalized configuration via `application.yml` or `application.yaml`.
-  - Database configuration in `src/main/resources/application.yml`.
-  - Test configuration in `src/test/resources/application.yml`.
-- **Persistence**:
-  - Use of Spring Data JPA Repositories for data access patterns.
-  - Entities should define relationships correctly (e.g., `@OneToMany`, `@ManyToOne`).
-  - Integration tests use TestContainers to automatically provision PostgreSQL instances.
-
-## Key Files & Components
-
-- `pom.xml`: Maven build configuration, defining dependencies and plugins.
-- `FitnessBotApplication.java`: Main Spring Boot application class.
-- `TrainingDayParser.java`: Core utility for parsing unstructured workout text.
-- `model/User.java`, `model/TrainingDay.java`, `model/Exercise.java`: Domain entities mapped to database tables.
-- `repository/UserRepository.java`: Example Spring Data JPA repository interface.
-- `service/TrainingDayService.java`: Central business logic service for managing training days.
-- `src/test/java/com/example/fitnessbot/integration/*`: Integration tests using TestContainers with PostgreSQL.
-- `src/main/resources/application.yml`: Main application configuration with PostgreSQL settings.
-- `src/test/resources/application.yml`: Test configuration.
-
-## Usage Instructions
-
-This project is intended to be extended with:
-- A Telegram webhook endpoint to receive forwarded messages.
-- Full implementation of the `TrainingDayService` including persistence logic.
-- Addition of controllers to handle inline keyboard interactions for navigation and logging.
-- Population of database repositories for full CRUD capabilities.
-- Implementation of Redis caching for improved performance.
-- Enhanced parsing logic for more complex workout formats.
-
-The application now includes:
-- PostgreSQL database integration with JPA/Hibernate.
-- Integration testing with TestContainers for reliable database tests.
-- Automated schema creation and migration via Hibernate.
-- Proper separation of main and test configurations.
-
-Future enhancements could involve integrating with AI services for advanced parsing or generating workout plans, though the current focus is on deterministic parsing of structured input.
-
-## Qwen Added Memories
-- "when you running tests and someting is failing, to fix that - try to find rootcause , not just remove all meaningfull parts of the test"
-- "after adding any new feature, create tests for that feature"
-- for making integration tests use abstractWithDbTest class ​
-- don't use leniet for mocks in tests
+- Preserve user changes in the working tree. Do not reset or revert unrelated files.
+- Use Liquibase for schema changes.
+- Keep secrets out of Docker images, git, logs, and final responses.
+- Prefer deterministic parser changes with regression tests using real examples.
+- Keep Telegram messages concise, readable during workouts, and safe for the configured parse mode.
+- Escape HTML when sending Telegram messages with `parseMode=HTML`.
+- Run Docker-backed tests when relevant; the user has explicitly said Docker works locally.
