@@ -226,10 +226,15 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         startButton.setText("Start Program");
         startButton.setCallbackData("start_program:" + programId);
 
+        InlineKeyboardButton renameButton = new InlineKeyboardButton();
+        renameButton.setText("Rename");
+        renameButton.setCallbackData("rename_program:" + programId);
+
         InlineKeyboardButton deleteButton = new InlineKeyboardButton();
         deleteButton.setText("Delete Program");
         deleteButton.setCallbackData("delete_program:" + programId);
-        rows.add(List.of(startButton, deleteButton));
+        rows.add(List.of(startButton, renameButton));
+        rows.add(List.of(deleteButton));
 
         for (com.example.fitnessbot.model.ProgramTrainingDay programTrainingDay : trainingDays) {
             TrainingDay trainingDay = programTrainingDay.getTrainingDay();

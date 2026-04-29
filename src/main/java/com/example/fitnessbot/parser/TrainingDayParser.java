@@ -26,6 +26,14 @@ public class TrainingDayParser {
 
     // Pattern to capture a list item. Supports bullets and numbered items like "1." or "2)".
     private static final Pattern LIST_ITEM_PATTERN = Pattern.compile("^(?:[\\u2043\\-\\u2022\\u2023\\u25E6\\*\\+\\u2219\\u2014\\u2013]|\\d+[.)])\\s*(.+)");
+    private static final String INLINE_BULLET_PATTERN_TEXT = "[\\u2043\\u2022\\u2023\\u25E6\\u2219]";
+    private static final Pattern INLINE_SECTION_PATTERN = Pattern.compile(
+            "(https?://\\S+)\\s+([\\p{L}][\\p{L}\\d &'’/+()\\-]{0,40}:)(?=\\s*" + INLINE_BULLET_PATTERN_TEXT + ")",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern INLINE_BULLET_PATTERN = Pattern.compile(
+            "([^\\n])\\s*(" + INLINE_BULLET_PATTERN_TEXT + ")\\s+"
+    );
     // Pattern for sets x reps like "3 x 6", "3x8-10", "4x6+", or "2xMAX".
     private static final Pattern SET_REP_PATTERN = Pattern.compile("(\\d+)\\s*[xхX]\\s*([\\p{L}\\d]+(?:-[\\p{L}\\d]+)?\\+?)");
     private static final Pattern TRAILING_PAREN_NOTE_PATTERN = Pattern.compile("\\s+(\\([^)]*\\))\\s*$");
@@ -43,7 +51,7 @@ public class TrainingDayParser {
             return day;
         }
 
-        String[] lines = rawText.split("\\r?\\n");
+        String[] lines = normalizeCompactTelegramLists(rawText).split("\\r?\\n");
         String currentSection = "General"; // Default section name
         int position = 0;
 
@@ -124,6 +132,15 @@ public class TrainingDayParser {
         return day;
     }
 
+    private String normalizeCompactTelegramLists(String rawText) {
+        String text = rawText.replace("\r\n", "\n").replace('\r', '\n');
+
+        // Telegram copy/paste can produce "Section: ⁃ A ⁃ B" on one line.
+        // Expand only clear bullet markers so URLs and ordinary text stay intact.
+        text = INLINE_SECTION_PATTERN.matcher(text).replaceAll("$1\n$2");
+        return INLINE_BULLET_PATTERN.matcher(text).replaceAll("$1\n$2 ");
+    }
+
     /**
      * Validates if a URL is safe to store
      * @param url The URL to validate
@@ -148,7 +165,7 @@ public class TrainingDayParser {
         if (notes == null || notes.isBlank()) {
             return;
         }
-        exercise.setNotes(notes);
+        exercise.setNotes(notes.trim().replaceAll("\\s+", " "));
     }
 
     private void applySectionInstructionIfNeeded(Exercise exercise, String currentSection) {

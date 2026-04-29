@@ -184,6 +184,23 @@ public class ProgramService {
         return true;
     }
 
+    @Transactional
+    public Program renameProgramForUser(Long programId, Long telegramUserId, String newName) throws ProgramException {
+        String normalizedName = newName == null ? "" : newName.trim();
+        if (normalizedName.isEmpty()) {
+            throw new ProgramException("Program name can't be empty.");
+        }
+
+        User user = userRepository.findByTelegramId(telegramUserId)
+                .orElseThrow(() -> new ProgramException("Program not found."));
+
+        Program program = programRepository.findByIdAndUserId(programId, user.getId())
+                .orElseThrow(() -> new ProgramException("Program not found."));
+
+        program.setName(normalizedName);
+        return programRepository.save(program);
+    }
+
     @Transactional(readOnly = true)
     public TrainingDay getActiveTrainingDayForUser(Long telegramUserId) {
         return userRepository.findByTelegramId(telegramUserId)

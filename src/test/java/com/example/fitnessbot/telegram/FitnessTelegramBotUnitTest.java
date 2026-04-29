@@ -1,6 +1,8 @@
 package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.ProgramRenameSessionManager;
+import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
@@ -37,6 +39,9 @@ class FitnessTelegramBotUnitTest {
     @Mock
     private WorkoutService workoutService;
 
+    @Mock
+    private ProgramService programService;
+
     private FitnessTelegramBot fitnessTelegramBot;
 
     @BeforeEach
@@ -51,7 +56,19 @@ class FitnessTelegramBotUnitTest {
             new ShowDayCommandHandler(trainingDayService)
         );
 
-        FitnessTelegramBot bot = new FitnessTelegramBot(trainingDayService, workoutService, new ProgramCreationSessionManager(), commandHandlers, callbackQueryHandlers, new CommandRegistryService(), mock(MenuKeyboardFactory.class), "test-token", "test-username");
+        FitnessTelegramBot bot = new FitnessTelegramBot(
+                trainingDayService,
+                workoutService,
+                programService,
+                new ProgramCreationSessionManager(),
+                new ProgramRenameSessionManager(),
+                commandHandlers,
+                callbackQueryHandlers,
+                new CommandRegistryService(),
+                mock(MenuKeyboardFactory.class),
+                "test-token",
+                "test-username"
+        );
         fitnessTelegramBot = spy(bot);
     }
 

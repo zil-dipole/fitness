@@ -179,12 +179,13 @@ class ShowProgramCommandHandlerTest {
         assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
 
         InlineKeyboardMarkup markup = (InlineKeyboardMarkup) response.getReplyMarkup();
-        assertThat(markup.getKeyboard()).hasSize(3);
+        assertThat(markup.getKeyboard()).hasSize(4);
         assertThat(markup.getKeyboard().get(0)).extracting(InlineKeyboardButton::getCallbackData)
-                .containsExactly("start_program:1", "delete_program:1");
-        assertThat(markup.getKeyboard().get(1).get(0).getText()).isEqualTo("Day 1: Upper Body");
-        assertThat(markup.getKeyboard().get(1).get(0).getCallbackData()).isEqualTo("show_day_1");
-        assertThat(markup.getKeyboard().get(2).get(0).getCallbackData()).isEqualTo("show_day_2");
+                .containsExactly("start_program:1", "rename_program:1");
+        assertThat(markup.getKeyboard().get(1).get(0).getCallbackData()).isEqualTo("delete_program:1");
+        assertThat(markup.getKeyboard().get(2).get(0).getText()).isEqualTo("Day 1: Upper Body");
+        assertThat(markup.getKeyboard().get(2).get(0).getCallbackData()).isEqualTo("show_day_1");
+        assertThat(markup.getKeyboard().get(3).get(0).getCallbackData()).isEqualTo("show_day_2");
 
         verifyNoInteractions(sessionManager);
         verify(programService).getProgramForUser(1L, TEST_TELEGRAM_ID);

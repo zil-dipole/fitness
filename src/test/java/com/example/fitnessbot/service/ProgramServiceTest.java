@@ -109,6 +109,38 @@ class ProgramServiceTest {
     }
 
     @Test
+    void testRenameProgramForUser() throws Exception {
+        Long telegramUserId = 123L;
+        Long userId = 1L;
+        Long programId = 10L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setTelegramId(telegramUserId);
+
+        Program program = new Program();
+        program.setId(programId);
+        program.setName("Old Name");
+        program.setUser(user);
+
+        when(userRepository.findByTelegramId(telegramUserId)).thenReturn(Optional.of(user));
+        when(programRepository.findByIdAndUserId(programId, userId)).thenReturn(Optional.of(program));
+        when(programRepository.save(program)).thenReturn(program);
+
+        Program result = programService.renameProgramForUser(programId, telegramUserId, "  New Name  ");
+
+        assertThat(result.getName()).isEqualTo("New Name");
+        verify(programRepository).save(program);
+    }
+
+    @Test
+    void testRenameProgramForUserRejectsBlankName() {
+        assertThatThrownBy(() -> programService.renameProgramForUser(10L, 123L, "   "))
+                .isInstanceOf(ProgramException.class)
+                .hasMessage("Program name can't be empty.");
+    }
+
+    @Test
     void testGetActiveProgramWhenUserExists() {
         // Given
         Long telegramUserId = 123L;

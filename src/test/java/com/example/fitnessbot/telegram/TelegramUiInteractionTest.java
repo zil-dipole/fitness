@@ -1,9 +1,11 @@
 package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.model.Exercise;
+import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.User;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.ProgramRenameSessionManager;
 import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.WorkoutService;
@@ -68,7 +70,9 @@ class TelegramUiInteractionTest {
         FitnessTelegramBot bot = new FitnessTelegramBot(
             trainingDayService,
             workoutService,
+            programService,
             sessionManager,
+            new ProgramRenameSessionManager(),
             commandHandlers,
             callbackQueryHandlers,
             new CommandRegistryService(),
@@ -310,6 +314,33 @@ class TelegramUiInteractionTest {
         assertNotNull(sentMessage);
         assertTrue(sentMessage.getText().contains("Strength"));
         assertTrue(sentMessage.getText().contains("1. Upper Body"));
+    }
+
+    @Test
+    void testRenameProgramWorkflow() throws Exception {
+        Program program = new Program();
+        program.setId(1L);
+        program.setName("Strength");
+
+        when(programService.getProgramForUser(1L, USER_ID)).thenReturn(java.util.Optional.of(program));
+        when(programService.renameProgramForUser(1L, USER_ID, "New Strength")).thenAnswer(invocation -> {
+            program.setName("New Strength");
+            return program;
+        });
+
+        Update renameButtonUpdate = createMockUpdateWithCallbackQuery("rename_program:1");
+        fitnessTelegramBot.onUpdateReceived(renameButtonUpdate);
+
+        Update renameTextUpdate = createMockUpdateWithCommand("New Strength");
+        fitnessTelegramBot.onUpdateReceived(renameTextUpdate);
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot, atLeast(2)).sendTelegramMessage(captor.capture());
+
+        assertTrue(captor.getAllValues().stream().anyMatch(message ->
+                message.getText() != null && message.getText().contains("Send the new name for \"Strength\".")));
+        assertTrue(captor.getAllValues().stream().anyMatch(message ->
+                message.getText() != null && message.getText().contains("Program renamed to \"New Strength\".")));
     }
 
     @Test

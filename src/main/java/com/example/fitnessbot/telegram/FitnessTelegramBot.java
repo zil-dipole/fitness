@@ -1,9 +1,12 @@
 package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.exception.TrainingDayException;
+import com.example.fitnessbot.exception.ProgramException;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.ProgramRenameSessionManager;
+import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.commands.CallbackQueryHandler;
@@ -44,7 +47,9 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private final TrainingDayService trainingDayService;
     private final WorkoutService workoutService;
+    private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
+    private final ProgramRenameSessionManager renameSessionManager;
     private final List<CommandHandler> commandHandlers;
     private final List<CallbackQueryHandler> callbackQueryHandlers;
     private final CommandRegistryService commandRegistryService;
@@ -54,7 +59,9 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     public FitnessTelegramBot(TrainingDayService trainingDayService,
                               WorkoutService workoutService,
+                              ProgramService programService,
                               ProgramCreationSessionManager sessionManager,
+                              ProgramRenameSessionManager renameSessionManager,
                               List<CommandHandler> commandHandlers,
                               List<CallbackQueryHandler> callbackQueryHandlers,
                               CommandRegistryService commandRegistryService,
@@ -64,7 +71,9 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         super(botToken);
         this.trainingDayService = trainingDayService;
         this.workoutService = workoutService;
+        this.programService = programService;
         this.sessionManager = sessionManager;
+        this.renameSessionManager = renameSessionManager;
         this.commandHandlers = commandHandlers;
         this.callbackQueryHandlers = callbackQueryHandlers;
         this.commandRegistryService = commandRegistryService;
@@ -173,6 +182,11 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     // Handle command suggestions (new functionality)
                     if (callbackData.startsWith("show_program:")) {
                         handleCommandCallback(callbackQuery, "/show_program " + callbackData.substring("show_program:".length()));
+                        acknowledgeCallbackQuery(callbackQuery, null);
+                        return;
+                    } else if (callbackData.startsWith("rename_program:")) {
+                        SendMessage renamePrompt = buildRenameProgramPrompt(callbackQuery);
+                        sendTelegramMessage(renamePrompt);
                         acknowledgeCallbackQuery(callbackQuery, null);
                         return;
                     } else if (callbackData.startsWith("cmd:")) {
@@ -390,6 +404,11 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
+        if (renameSessionManager.hasPendingRename(userId)) {
+            handleProgramRenameMessage(update);
+            return;
+        }
+
         if (!workoutService.hasWorkoutInputContext(userId)) {
             return;
         }
@@ -425,6 +444,64 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             } catch (Exception telegramApiException) {
                 log.error("Failed to send workout error message to user", telegramApiException);
             }
+        }
+    }
+
+    private SendMessage buildRenameProgramPrompt(CallbackQuery callbackQuery) {
+        SendMessage response = new SendMessage();
+        response.setChatId(callbackQuery.getMessage().getChatId().toString());
+
+        Long programId;
+        try {
+            programId = Long.parseLong(callbackQuery.getData().substring("rename_program:".length()));
+        } catch (NumberFormatException e) {
+            response.setText("Invalid program ID.");
+            return response;
+        }
+
+        var program = programService.getProgramForUser(programId, callbackQuery.getFrom().getId());
+        if (program.isEmpty()) {
+            response.setText("I couldn't find that program.");
+            return response;
+        }
+
+        renameSessionManager.startRename(callbackQuery.getFrom().getId(), programId);
+        response.setText("Send the new name for \"" + program.get().getName() + "\".");
+        return response;
+    }
+
+    private void handleProgramRenameMessage(Update update) {
+        Long userId = update.getMessage().getFrom().getId();
+        Long programId = renameSessionManager.getProgramId(userId);
+        if (programId == null) {
+            renameSessionManager.endRename(userId);
+            return;
+        }
+
+        SendMessage response = new SendMessage();
+        response.setChatId(update.getMessage().getChatId().toString());
+
+        try {
+            var program = programService.renameProgramForUser(programId, userId, update.getMessage().getText());
+            renameSessionManager.endRename(userId);
+            response.setText("✅ Program renamed to \"" + program.getName() + "\".\n\nUse /show_program " + program.getId() + " to open it.");
+        } catch (ProgramException e) {
+            if ("Program name can't be empty.".equals(e.getMessage())) {
+                response.setText("Program name can't be empty.\n\nSend a new name.");
+            } else {
+                renameSessionManager.endRename(userId);
+                response.setText(e.getMessage());
+            }
+        } catch (Exception e) {
+            renameSessionManager.endRename(userId);
+            log.error("Failed to rename program for user {}", userId, e);
+            response.setText("I couldn't rename that program.\nPlease try again.");
+        }
+
+        try {
+            sendTelegramMessage(response);
+        } catch (Exception telegramApiException) {
+            log.error("Failed to send rename program message to user", telegramApiException);
         }
     }
 

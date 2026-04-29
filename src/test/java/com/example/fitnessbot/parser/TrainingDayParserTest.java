@@ -435,4 +435,52 @@ class TrainingDayParserTest {
         assertThat(day.getExercises().get(4).getName()).isEqualTo("Spanish squat x 45 sec");
         assertThat(day.getExercises().get(4).getNotes()).isEqualTo("Круги: ISO 3 круга");
     }
+
+    @Test
+    void testParseCompactTelegramProgramWithInlineBullets() {
+        String rawText = """
+                Warm up: ⁃ МФР ⁃ Adductor rockback + thread the needle 2 x 8  https://youtube.com/shorts/fAD-CIYHWlM?si=XWkLKDTxHUGCxFW ⁃ Dead bug 2 x 5(сторона) https://youtube.com/shorts/DqLL45uk2Tk?si=uPugpKSCaR9by4tD
+                Base: ⁃ Wall slides banded 2 x 10 https://youtube.com/shorts/aA8Agczo7qY?si=TroncTL6gW9nnQRD ⁃ Seated Cable row 3 x 12 RPE6 https://youtube.com/shorts/1Cfjgf2FBqc?si=PVLcPODvIqGjt4Cd 5,10,10 ⁃ Landmine press 3 x 10 https://youtu.be/6cSTRPhpubs?si=vvnM4iqOCMUMilKc 5, ; 7,5 ; 7, 5 ⁃ Prone swimmers 2 x 12 https://youtube.com/shorts/zauTEhTdN0I?si=K8fIv2TAcQ695CMs ⁃ Tibial raises 3 x15 https://youtube.com/shorts/Dd-8s86-zio?si=Zj02GIsZXOdcKile ⁃ Frog pump 3 x 20 https://youtu.be/rzjQ8XpXt1Q?si=ukxKvgb60jiNWKLX
+                Core: ⁃ Hang crunches 3 x 10 https://youtube.com/shorts/Yg1EtGEKiKc?si=TImUnHd0P5uvp7o5
+                """;
+
+        TrainingDay day = parser.parse(rawText);
+
+        assertThat(day.getExercises()).hasSize(10);
+        assertThat(day.getExercises()).extracting(Exercise::getSection)
+                .containsExactly(
+                        "Warm up", "Warm up", "Warm up",
+                        "Base", "Base", "Base", "Base", "Base", "Base",
+                        "Core"
+                );
+
+        Exercise adductor = day.getExercises().get(1);
+        assertThat(adductor.getName()).isEqualTo("Adductor rockback + thread the needle 2 x 8");
+        assertThat(adductor.getSets()).isEqualTo(2);
+        assertThat(adductor.getRepsOrDuration()).isEqualTo("8");
+        assertThat(adductor.getVideoUrls()).containsExactly("https://youtube.com/shorts/fAD-CIYHWlM?si=XWkLKDTxHUGCxFW");
+
+        Exercise deadBug = day.getExercises().get(2);
+        assertThat(deadBug.getName()).isEqualTo("Dead bug");
+        assertThat(deadBug.getSets()).isEqualTo(2);
+        assertThat(deadBug.getRepsOrDuration()).isEqualTo("5");
+        assertThat(deadBug.getNotes()).isEqualTo("(сторона)");
+
+        Exercise row = day.getExercises().get(4);
+        assertThat(row.getName()).isEqualTo("Seated Cable row");
+        assertThat(row.getSets()).isEqualTo(3);
+        assertThat(row.getRepsOrDuration()).isEqualTo("12");
+        assertThat(row.getNotes()).isEqualTo("RPE6 5,10,10");
+        assertThat(row.getVideoUrls()).containsExactly("https://youtube.com/shorts/1Cfjgf2FBqc?si=PVLcPODvIqGjt4Cd");
+
+        Exercise landmine = day.getExercises().get(5);
+        assertThat(landmine.getName()).isEqualTo("Landmine press");
+        assertThat(landmine.getNotes()).isEqualTo("5, ; 7,5 ; 7, 5");
+
+        Exercise core = day.getExercises().get(9);
+        assertThat(core.getName()).isEqualTo("Hang crunches 3 x 10");
+        assertThat(core.getSets()).isEqualTo(3);
+        assertThat(core.getRepsOrDuration()).isEqualTo("10");
+        assertThat(core.getVideoUrls()).containsExactly("https://youtube.com/shorts/Yg1EtGEKiKc?si=TImUnHd0P5uvp7o5");
+    }
 }
