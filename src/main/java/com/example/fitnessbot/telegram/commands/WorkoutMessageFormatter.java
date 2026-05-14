@@ -1,6 +1,7 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.model.UserLanguage;
 import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.WorkoutService;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -24,6 +25,7 @@ public final class WorkoutMessageFormatter {
     public static final String FINISH_WORKOUT_CALLBACK = "finish_workout";
 
     private static final DateTimeFormatter HISTORY_DATE_FORMAT = DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH);
+    private static final DateTimeFormatter HISTORY_DATE_FORMAT_RU = DateTimeFormatter.ofPattern("dd MMM", Locale.forLanguageTag("ru"));
     private static final Pattern SAVED_LOAD_PATTERN = Pattern.compile(
             "Saved (set|round) (\\d+): (.*?)(?:\\.\\s+(?:Next|Training)|\\.$|$).*",
             Pattern.CASE_INSENSITIVE
@@ -33,51 +35,62 @@ public final class WorkoutMessageFormatter {
     }
 
     public static String formatExerciseResult(String message, WorkoutService.WorkoutExerciseView view) {
-        return formatResultMessage(message) + "\n" + formatExerciseView(view);
+        return formatExerciseResult(message, view, UserLanguage.ENGLISH);
+    }
+
+    public static String formatExerciseResult(String message,
+                                              WorkoutService.WorkoutExerciseView view,
+                                              UserLanguage language) {
+        return formatResultMessage(message, language) + "\n" + formatExerciseView(view, language);
     }
 
     public static String formatFinishScreen(String completionMessage,
                                             ProgramService.ActiveTrainingDayProgression progression) {
+        return formatFinishScreen(completionMessage, progression, UserLanguage.ENGLISH);
+    }
+
+    public static String formatFinishScreen(String completionMessage,
+                                            ProgramService.ActiveTrainingDayProgression progression,
+                                            UserLanguage language) {
         StringBuilder response = new StringBuilder();
         boolean completedFiveWeeks = progression != null && progression.completedFiveWeeks();
 
-        if (completedFiveWeeks) {
-            response.append("🏁 <b>5 weeks completed</b>");
-        } else {
-            response.append("✅ <b>Training day complete</b>");
-        }
+        response.append(BotText.workoutFinishTitle(completedFiveWeeks, language));
 
-        String result = cleanText(completionMessage);
+        String result = formatCompletionMessage(completionMessage, language);
         if (result != null) {
             response.append("\n")
-                    .append(TrainingDayMessageFormatter.escapeHtml(result));
+                    .append(result);
         }
 
         if (completedFiveWeeks) {
-            response.append("\nYou completed 5 weeks of this program.");
+            response.append("\n").append(BotText.workoutFiveWeeksDone(language));
         }
 
         if (progression == null || progression.trainingDay() == null) {
             return response.toString();
         }
 
-        response.append("\n\nNext: <b>")
-                .append(trainingDayTitle(progression.trainingDay()))
-                .append("</b>\n")
-                .append("Week ")
-                .append(progression.weekNumber())
-                .append(" is ready.\n")
-                .append("Tap Start Day when you're ready.");
+        response.append("\n\n")
+                .append(BotText.workoutNextDay(trainingDayTitle(progression.trainingDay()), language))
+                .append("\n")
+                .append(BotText.workoutWeekReady(progression.weekNumber(), language))
+                .append("\n")
+                .append(BotText.workoutStartDayHint(language));
 
         return response.toString();
     }
 
     public static String formatExerciseView(WorkoutService.WorkoutExerciseView view) {
+        return formatExerciseView(view, UserLanguage.ENGLISH);
+    }
+
+    public static String formatExerciseView(WorkoutService.WorkoutExerciseView view, UserLanguage language) {
         StringBuilder response = new StringBuilder();
-        String stepLabel = view.circuit() ? "Round" : "Set";
-        String promptLabel = view.circuit() ? "round" : "set";
+        String stepLabel = stepLabel(view.circuit(), true, language);
+        String promptLabel = stepLabel(view.circuit(), false, language);
         String note = cleanText(view.notes());
-        String target = formatRepsOrDuration(view.repsOrDuration());
+        String target = formatRepsOrDuration(view.repsOrDuration(), language);
         if (note != null && note.toLowerCase(Locale.ROOT).startsWith("rpe")) {
             target = target + " @ " + TrainingDayMessageFormatter.escapeHtml(note);
             note = null;
@@ -108,20 +121,19 @@ public final class WorkoutMessageFormatter {
                     .append("\n");
         }
 
-        appendHistory(response, view.history());
-        response.append("👉 <b>Load for ")
-                .append(promptLabel)
-                .append(" ")
-                .append(view.currentSetNumber())
-                .append(":</b> ")
-                .append("60 · red band · bodyweight · none");
+        appendHistory(response, view.history(), language);
+        response.append(BotText.workoutLoadPrompt(promptLabel, view.currentSetNumber(), language));
 
         return response.toString();
     }
 
     public static InlineKeyboardMarkup startDayKeyboard() {
+        return startDayKeyboard(UserLanguage.ENGLISH);
+    }
+
+    public static InlineKeyboardMarkup startDayKeyboard(UserLanguage language) {
         InlineKeyboardButton startButton = new InlineKeyboardButton();
-        startButton.setText("Start Day");
+        startButton.setText(BotText.workoutStartDayButton(language));
         startButton.setCallbackData(START_ACTIVE_DAY_CALLBACK);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -130,30 +142,34 @@ public final class WorkoutMessageFormatter {
     }
 
     public static InlineKeyboardMarkup exerciseKeyboard() {
-        return exerciseKeyboard(null);
+        return exerciseKeyboard(null, UserLanguage.ENGLISH);
     }
 
     public static InlineKeyboardMarkup exerciseKeyboard(WorkoutService.WorkoutExerciseView view) {
+        return exerciseKeyboard(view, UserLanguage.ENGLISH);
+    }
+
+    public static InlineKeyboardMarkup exerciseKeyboard(WorkoutService.WorkoutExerciseView view, UserLanguage language) {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        String previousLoad = previousLoadForButton(view);
+        String previousLoad = previousLoadForButton(view, language);
         if (previousLoad != null) {
             InlineKeyboardButton previousWeightButton = new InlineKeyboardButton();
-            previousWeightButton.setText("Use " + previousLoad);
+            previousWeightButton.setText(BotText.workoutUsePreviousButton(previousLoad, language));
             previousWeightButton.setCallbackData(PREVIOUS_WEIGHT_CALLBACK);
             rows.add(List.of(previousWeightButton));
         }
 
         InlineKeyboardButton noLoadButton = new InlineKeyboardButton();
-        noLoadButton.setText("No load");
+        noLoadButton.setText(BotText.workoutNoLoadButton(language));
         noLoadButton.setCallbackData(NO_LOAD_CALLBACK);
 
         InlineKeyboardButton skipButton = new InlineKeyboardButton();
-        skipButton.setText("Skip Exercise");
+        skipButton.setText(BotText.workoutSkipButton(language));
         skipButton.setCallbackData(SKIP_EXERCISE_CALLBACK);
 
         InlineKeyboardButton finishButton = new InlineKeyboardButton();
-        finishButton.setText("Finish Day");
+        finishButton.setText(BotText.workoutFinishDayButton(language));
         finishButton.setCallbackData(FINISH_WORKOUT_CALLBACK);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -163,50 +179,53 @@ public final class WorkoutMessageFormatter {
         return markup;
     }
 
-    private static void appendHistory(StringBuilder response, List<WorkoutService.WorkoutHistoryEntry> history) {
+    private static void appendHistory(StringBuilder response,
+                                      List<WorkoutService.WorkoutHistoryEntry> history,
+                                      UserLanguage language) {
         if (history.isEmpty()) {
             return;
         }
 
         WorkoutService.WorkoutHistoryEntry entry = history.getFirst();
         String loads = entry.loads().stream()
-                .map(WorkoutMessageFormatter::formatLoad)
+                .map(load -> formatLoad(load, language))
                 .collect(Collectors.joining(" / "));
-        response.append("Last ")
-                .append(entry.startedAt().format(HISTORY_DATE_FORMAT))
+        response.append(BotText.workoutHistoryPrefix(language))
+                .append(entry.startedAt().format(BotText.isRussian(language) ? HISTORY_DATE_FORMAT_RU : HISTORY_DATE_FORMAT))
                 .append(": ")
                 .append(loads)
                 .append("\n");
     }
 
-    private static String formatResultMessage(String message) {
+    private static String formatResultMessage(String message, UserLanguage language) {
         if (message == null || message.isBlank()) {
-            return "✅ Saved";
+            return BotText.workoutSavedDefault(language);
         }
 
         Matcher matcher = SAVED_LOAD_PATTERN.matcher(message.trim());
         if (matcher.matches()) {
-            String stepLabel = matcher.group(1).toLowerCase(Locale.ROOT);
+            boolean circuit = "round".equalsIgnoreCase(matcher.group(1));
+            String stepLabel = stepLabel(circuit, false, language);
             String stepNumber = matcher.group(2);
-            String load = matcher.group(3).trim();
-            return "✅ <b>" + TrainingDayMessageFormatter.escapeHtml(load) + " saved</b> · " + stepLabel + " " + stepNumber;
+            String load = formatLoad(matcher.group(3).trim(), language);
+            return BotText.workoutSavedLoad(load, stepLabel, stepNumber, language);
         }
 
         if (message.toLowerCase(Locale.ROOT).startsWith("skipped")) {
-            return "⏭ <b>Skipped</b>";
+            return BotText.workoutSkipped(language);
         }
 
         return TrainingDayMessageFormatter.escapeHtml(message);
     }
 
-    private static String formatRepsOrDuration(String repsOrDuration) {
+    private static String formatRepsOrDuration(String repsOrDuration, UserLanguage language) {
         String value = cleanText(repsOrDuration);
         if (value == null) {
-            return "do prescribed work";
+            return BotText.workoutPrescribedWork(language);
         }
 
         if (value.matches("\\d+(?:[.,]\\d+)?")) {
-            return TrainingDayMessageFormatter.escapeHtml(value) + " reps";
+            return BotText.workoutReps(TrainingDayMessageFormatter.escapeHtml(value), language);
         }
 
         return TrainingDayMessageFormatter.escapeHtml(value);
@@ -220,11 +239,15 @@ public final class WorkoutMessageFormatter {
         return value.trim().replaceAll("\\s+", " ");
     }
 
-    private static String formatLoad(String load) {
+    private static String formatLoad(String load, UserLanguage language) {
         if (load == null || load.isBlank()) {
-            return "no load";
+            return BotText.noLoadDisplay(language);
         }
-        return TrainingDayMessageFormatter.escapeHtml(load);
+        String normalized = load.trim().toLowerCase(Locale.ROOT);
+        if ("no load".equals(normalized) || "none".equals(normalized)) {
+            return BotText.noLoadDisplay(language);
+        }
+        return TrainingDayMessageFormatter.escapeHtml(load.trim());
     }
 
     private static String trainingDayTitle(TrainingDay trainingDay) {
@@ -235,12 +258,12 @@ public final class WorkoutMessageFormatter {
         return TrainingDayMessageFormatter.escapeHtml(title);
     }
 
-    private static String previousLoadForButton(WorkoutService.WorkoutExerciseView view) {
+    private static String previousLoadForButton(WorkoutService.WorkoutExerciseView view, UserLanguage language) {
         if (view == null) {
             return null;
         }
         if (view.previousLoad() != null && !view.previousLoad().isBlank()) {
-            return truncateButtonValue(view.previousLoad().trim());
+            return truncateButtonValue(formatLoad(view.previousLoad(), language));
         }
         if (view.previousWeightKg() != null && view.previousWeightKg() > 0) {
             return formatWeight(view.previousWeightKg()) + " kg";
@@ -257,5 +280,20 @@ public final class WorkoutMessageFormatter {
 
     private static String formatWeight(double weight) {
         return BigDecimal.valueOf(weight).stripTrailingZeros().toPlainString();
+    }
+
+    private static String formatCompletionMessage(String message, UserLanguage language) {
+        String result = cleanText(message);
+        if (result == null) {
+            return null;
+        }
+        if ("Training day finished.".equals(result)) {
+            return BotText.workoutFinishedManually(language);
+        }
+        return formatResultMessage(result, language);
+    }
+
+    private static String stepLabel(boolean circuit, boolean capitalized, UserLanguage language) {
+        return BotText.workoutStepLabel(circuit, capitalized, language);
     }
 }

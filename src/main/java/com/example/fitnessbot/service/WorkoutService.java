@@ -23,7 +23,17 @@ public class WorkoutService {
     private static final int HISTORY_SESSION_LIMIT = 3;
     private static final Pattern WEIGHT_INPUT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)(?:\\s*(?:kg|kgs|kilogram|kilograms))?", Pattern.CASE_INSENSITIVE);
     private static final Pattern CIRCUIT_SECTION_PATTERN = Pattern.compile(".*?(\\d+)\\s*(?:rounds?|circles?|круг(?:а|ов)?).*", Pattern.CASE_INSENSITIVE);
-    private static final Set<String> NO_LOAD_INPUTS = Set.of("-", "none", "no weight", "no load", "skip");
+    private static final Set<String> NO_LOAD_INPUTS = Set.of(
+            "-",
+            "none",
+            "no weight",
+            "no load",
+            "skip",
+            "нет",
+            "без веса",
+            "без нагрузки",
+            "пропустить"
+    );
 
     public record WorkoutExerciseView(
             Long sessionId,
@@ -58,6 +68,9 @@ public class WorkoutService {
     }
 
     private record CircuitGroup(int startIndex, int endIndex, int rounds) {
+    }
+
+    private record SkippedAdvance(Exercise exercise, int setNumber, boolean replayWholeExercise) {
     }
 
     private final UserRepository userRepository;
@@ -138,6 +151,8 @@ public class WorkoutService {
         session.setCurrentSetNumber(1);
         session.setStatus(WorkoutSessionStatus.IN_PROGRESS);
         session.setStartedAt(LocalDateTime.now());
+        session.setRevisitingSkippedExercises(false);
+        session.setSkippedSteps(new ArrayList<>());
 
         return toView(workoutSessionRepository.save(session));
     }
@@ -178,6 +193,9 @@ public class WorkoutService {
         workoutSetLogRepository.save(setLog);
 
         updateLastWeight(exercise, load.weightKg());
+        if (Boolean.TRUE.equals(session.getRevisitingSkippedExercises())) {
+            return advanceWithinSkippedReplay(session, exercise, savedSetNumber, load.displayValue());
+        }
         return advanceAfterRecordedSet(session, exercise, savedSetNumber, load.displayValue());
     }
 
@@ -220,6 +238,13 @@ public class WorkoutService {
             throw new WorkoutException("Current workout exercise is missing.");
         }
 
+        if (Boolean.TRUE.equals(session.getRevisitingSkippedExercises())) {
+            return advanceSkippedReplayAfterSkip(session);
+        }
+
+        List<Exercise> exercises = orderedExercises(session.getTrainingDay());
+        boolean replayWholeExercise = circuitGroup(exercises, currentExercise).isEmpty();
+        queueSkippedStep(session, currentExercise, currentSetNumber(session), replayWholeExercise);
         return advanceAfterSkippedStep(session, currentExercise);
     }
 
@@ -239,16 +264,25 @@ public class WorkoutService {
         WorkoutSession activeSession = session.get();
         activeSession.setStatus(WorkoutSessionStatus.COMPLETED);
         activeSession.setCompletedAt(LocalDateTime.now());
+        activeSession.setRevisitingSkippedExercises(false);
+        mutableSkippedSteps(activeSession).clear();
         workoutSessionRepository.save(activeSession);
         return true;
     }
 
     private void ensureCurrentExercise(WorkoutSession session, Exercise firstExercise) {
         if (session.getCurrentExercise() == null) {
-            session.setCurrentExercise(firstExercise);
+            resolveSkippedReplayExercise(session, orderedExercises(session.getTrainingDay()))
+                    .ifPresentOrElse(session::setCurrentExercise, () -> session.setCurrentExercise(firstExercise));
         }
         if (session.getCurrentSetNumber() == null || session.getCurrentSetNumber() < 1) {
             session.setCurrentSetNumber(1);
+        }
+        if (session.getSkippedSteps() == null) {
+            session.setSkippedSteps(new ArrayList<>());
+        }
+        if (session.getRevisitingSkippedExercises() == null) {
+            session.setRevisitingSkippedExercises(false);
         }
     }
 
@@ -276,6 +310,8 @@ public class WorkoutService {
         session.setCurrentSetNumber(1);
         session.setStatus(WorkoutSessionStatus.IN_PROGRESS);
         session.setStartedAt(LocalDateTime.now());
+        session.setRevisitingSkippedExercises(false);
+        session.setSkippedSteps(new ArrayList<>());
         return workoutSessionRepository.save(session);
     }
 
@@ -322,8 +358,12 @@ public class WorkoutService {
             );
         }
 
-        completeSession(session);
-        return new WeightEntryResult(true, true, "Saved set " + savedSetNumber + ": " + displayValue + ". Training day completed.", null);
+        return continueWithSkippedOrComplete(
+                session,
+                exercises,
+                "Saved set " + savedSetNumber + ": " + displayValue + ". Returning to skipped exercise:",
+                "Saved set " + savedSetNumber + ": " + displayValue + ". Training day completed."
+        );
     }
 
     private WeightEntryResult advanceAfterSkippedStep(WorkoutSession session, Exercise currentExercise) {
@@ -349,8 +389,12 @@ public class WorkoutService {
             return new WeightEntryResult(true, false, "Skipped exercise. Next exercise:", toView(session));
         }
 
-        completeSession(session);
-        return new WeightEntryResult(true, true, "Skipped final exercise. Training day completed.", null);
+        return continueWithSkippedOrComplete(
+                session,
+                exercises,
+                "Skipped final exercise. Returning to skipped exercise:",
+                "Skipped final exercise. Training day completed."
+        );
     }
 
     private WeightEntryResult advanceCircuit(WorkoutSession session,
@@ -383,13 +427,189 @@ public class WorkoutService {
             return new WeightEntryResult(true, false, nextExerciseMessage, toView(session));
         }
 
-        completeSession(session);
-        return new WeightEntryResult(true, true, completedMessage, null);
+        return continueWithSkippedOrComplete(
+                session,
+                exercises,
+                completedMessage.replace("Training day completed.", "Returning to skipped exercise:"),
+                completedMessage
+        );
+    }
+
+    private WeightEntryResult advanceWithinSkippedReplay(WorkoutSession session,
+                                                         Exercise exercise,
+                                                         int savedSetNumber,
+                                                         String displayValue) {
+        SkippedWorkoutStep skippedStep = currentSkippedStep(session)
+                .orElseThrow(() -> new IllegalStateException("Skipped replay state is missing."));
+
+        if (Boolean.TRUE.equals(skippedStep.getReplayWholeExercise())) {
+            int totalSets = totalSets(exercise);
+            if (savedSetNumber < totalSets) {
+                session.setCurrentSetNumber(savedSetNumber + 1);
+                workoutSessionRepository.save(session);
+                return new WeightEntryResult(
+                        true,
+                        false,
+                        "Saved set " + savedSetNumber + ": " + displayValue + ".",
+                        toView(session)
+                );
+            }
+        }
+
+        removeCurrentSkippedStep(session);
+        return continueSkippedReplayOrComplete(
+                session,
+                orderedExercises(session.getTrainingDay()),
+                skippedStep.getReplayWholeExercise() ? "Saved set " + savedSetNumber + ": " + displayValue + ". Next skipped exercise:"
+                        : "Saved round " + savedSetNumber + ": " + displayValue + ". Next skipped exercise:",
+                skippedStep.getReplayWholeExercise() ? "Saved set " + savedSetNumber + ": " + displayValue + ". Training day completed."
+                        : "Saved round " + savedSetNumber + ": " + displayValue + ". Training day completed."
+        );
+    }
+
+    private WeightEntryResult advanceSkippedReplayAfterSkip(WorkoutSession session) {
+        List<SkippedWorkoutStep> skippedSteps = mutableSkippedSteps(session);
+        if (skippedSteps.isEmpty()) {
+            session.setRevisitingSkippedExercises(false);
+            workoutSessionRepository.save(session);
+            return new WeightEntryResult(false, false, "There are no skipped exercises to return to.", null);
+        }
+
+        SkippedWorkoutStep currentSkippedStep = skippedSteps.getFirst();
+        if (Boolean.TRUE.equals(currentSkippedStep.getReplayWholeExercise())) {
+            currentSkippedStep.setSetNumber(currentSetNumber(session));
+        }
+
+        if (skippedSteps.size() == 1) {
+            workoutSessionRepository.save(session);
+            return new WeightEntryResult(true, false, "Skipped exercise. It is still pending.", toView(session));
+        }
+
+        skippedSteps.removeFirst();
+        skippedSteps.add(currentSkippedStep);
+        return continueSkippedReplayOrComplete(
+                session,
+                orderedExercises(session.getTrainingDay()),
+                "Skipped exercise. Next skipped exercise:",
+                "Skipped exercise. Training day completed."
+        );
+    }
+
+    private WeightEntryResult continueWithSkippedOrComplete(WorkoutSession session,
+                                                            List<Exercise> exercises,
+                                                            String revisitMessage,
+                                                            String completedMessage) {
+        if (mutableSkippedSteps(session).isEmpty()) {
+            completeSession(session);
+            return new WeightEntryResult(true, true, completedMessage, null);
+        }
+
+        session.setRevisitingSkippedExercises(true);
+        return continueSkippedReplayOrComplete(session, exercises, revisitMessage, completedMessage);
+    }
+
+    private WeightEntryResult continueSkippedReplayOrComplete(WorkoutSession session,
+                                                              List<Exercise> exercises,
+                                                              String nextSkippedMessage,
+                                                              String completedMessage) {
+        Optional<SkippedAdvance> skippedAdvance = nextSkippedAdvance(session, exercises);
+        if (skippedAdvance.isEmpty()) {
+            completeSession(session);
+            return new WeightEntryResult(true, true, completedMessage, null);
+        }
+
+        session.setRevisitingSkippedExercises(true);
+        session.setCurrentExercise(skippedAdvance.get().exercise());
+        session.setCurrentSetNumber(skippedAdvance.get().setNumber());
+        workoutSessionRepository.save(session);
+        return new WeightEntryResult(true, false, nextSkippedMessage, toView(session));
+    }
+
+    private Optional<SkippedAdvance> nextSkippedAdvance(WorkoutSession session, List<Exercise> exercises) {
+        List<SkippedWorkoutStep> skippedSteps = mutableSkippedSteps(session);
+        while (!skippedSteps.isEmpty()) {
+            SkippedWorkoutStep skippedStep = skippedSteps.getFirst();
+            Optional<Exercise> exercise = findExerciseById(exercises, skippedStep.getExerciseId());
+            if (exercise.isPresent()) {
+                int setNumber = skippedStep.getSetNumber() == null || skippedStep.getSetNumber() < 1 ? 1 : skippedStep.getSetNumber();
+                boolean replayWholeExercise = Boolean.TRUE.equals(skippedStep.getReplayWholeExercise());
+                return Optional.of(new SkippedAdvance(exercise.get(), setNumber, replayWholeExercise));
+            }
+            skippedSteps.removeFirst();
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Exercise> resolveSkippedReplayExercise(WorkoutSession session, List<Exercise> exercises) {
+        if (!Boolean.TRUE.equals(session.getRevisitingSkippedExercises())) {
+            return Optional.empty();
+        }
+        return nextSkippedAdvance(session, exercises).map(SkippedAdvance::exercise);
+    }
+
+    private Optional<Exercise> findExerciseById(List<Exercise> exercises, Long exerciseId) {
+        if (exerciseId == null) {
+            return Optional.empty();
+        }
+        return exercises.stream()
+                .filter(exercise -> sameId(exercise.getId(), exerciseId))
+                .findFirst();
+    }
+
+    private void queueSkippedStep(WorkoutSession session,
+                                  Exercise exercise,
+                                  int setNumber,
+                                  boolean replayWholeExercise) {
+        List<SkippedWorkoutStep> skippedSteps = mutableSkippedSteps(session);
+        Optional<SkippedWorkoutStep> existingStep = skippedSteps.stream()
+                .filter(step -> sameId(step.getExerciseId(), exercise.getId())
+                        && Boolean.TRUE.equals(step.getReplayWholeExercise()) == replayWholeExercise
+                        && (replayWholeExercise || Objects.equals(step.getSetNumber(), setNumber)))
+                .findFirst();
+
+        if (existingStep.isPresent()) {
+            existingStep.get().setSetNumber(setNumber);
+            return;
+        }
+
+        SkippedWorkoutStep skippedStep = new SkippedWorkoutStep();
+        skippedStep.setExerciseId(exercise.getId());
+        skippedStep.setSetNumber(setNumber);
+        skippedStep.setReplayWholeExercise(replayWholeExercise);
+        skippedSteps.add(skippedStep);
+    }
+
+    private Optional<SkippedWorkoutStep> currentSkippedStep(WorkoutSession session) {
+        List<SkippedWorkoutStep> skippedSteps = mutableSkippedSteps(session);
+        if (skippedSteps.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(skippedSteps.getFirst());
+    }
+
+    private void removeCurrentSkippedStep(WorkoutSession session) {
+        List<SkippedWorkoutStep> skippedSteps = mutableSkippedSteps(session);
+        if (!skippedSteps.isEmpty()) {
+            skippedSteps.removeFirst();
+        }
+    }
+
+    private List<SkippedWorkoutStep> mutableSkippedSteps(WorkoutSession session) {
+        if (session.getSkippedSteps() == null) {
+            session.setSkippedSteps(new ArrayList<>());
+        }
+        return session.getSkippedSteps();
+    }
+
+    private int currentSetNumber(WorkoutSession session) {
+        return session.getCurrentSetNumber() == null || session.getCurrentSetNumber() < 1 ? 1 : session.getCurrentSetNumber();
     }
 
     private void completeSession(WorkoutSession session) {
         session.setStatus(WorkoutSessionStatus.COMPLETED);
         session.setCompletedAt(LocalDateTime.now());
+        session.setRevisitingSkippedExercises(false);
+        mutableSkippedSteps(session).clear();
         workoutSessionRepository.save(session);
     }
 

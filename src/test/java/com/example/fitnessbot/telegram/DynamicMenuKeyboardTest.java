@@ -1,7 +1,9 @@
 package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.model.Program;
+import com.example.fitnessbot.model.UserLanguage;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.UserLanguageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -10,6 +12,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class DynamicMenuKeyboardTest {
 
@@ -35,7 +39,9 @@ class DynamicMenuKeyboardTest {
         assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getCallbackData)
                 .containsExactly("create_program", "view_programs");
         assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getText)
-                .containsExactly("Help");
+                .containsExactly("Language", "Help");
+        assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getCallbackData)
+                .containsExactly("language", "help");
     }
 
     @Test
@@ -53,7 +59,7 @@ class DynamicMenuKeyboardTest {
         assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getCallbackData)
                 .containsExactly("finish_program", "cancel_program");
         assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getText)
-                .containsExactly("Help");
+                .containsExactly("Language", "Help");
     }
 
     @Test
@@ -72,5 +78,20 @@ class DynamicMenuKeyboardTest {
 
         InlineKeyboardMarkup afterCancel = menuKeyboardFactory.createMainMenuKeyboard(TEST_USER_ID);
         assertThat(afterCancel.getKeyboard().getFirst().getFirst().getText()).isEqualTo("Create Program");
+    }
+
+    @Test
+    void testMainMenuUsesRussianLabels() {
+        UserLanguageService languageService = mock(UserLanguageService.class);
+        when(languageService.getLanguage(TEST_USER_ID)).thenReturn(UserLanguage.RUSSIAN);
+        DefaultMenuKeyboardFactory russianFactory = new DefaultMenuKeyboardFactory(sessionManager, languageService);
+
+        InlineKeyboardMarkup markup = russianFactory.createMainMenuKeyboard(TEST_USER_ID);
+
+        List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
+        assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getText)
+                .containsExactly("Создать программу", "Мои программы");
+        assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getText)
+                .containsExactly("Язык", "Помощь");
     }
 }

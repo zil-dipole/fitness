@@ -2,6 +2,7 @@ package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.model.Exercise;
 import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.model.UserLanguage;
 
 final class TrainingDayMessageFormatter {
 
@@ -9,6 +10,10 @@ final class TrainingDayMessageFormatter {
     }
 
     static String format(TrainingDay trainingDay) {
+        return format(trainingDay, UserLanguage.ENGLISH);
+    }
+
+    static String format(TrainingDay trainingDay, UserLanguage language) {
         StringBuilder response = new StringBuilder();
 
         if (trainingDay.getRawText() != null && !trainingDay.getRawText().isBlank()) {
@@ -20,7 +25,7 @@ final class TrainingDayMessageFormatter {
         response.append("<b>").append(escapeHtml(trainingDay.getTitle())).append("</b>\n\n");
 
         if (trainingDay.getExercises() != null && !trainingDay.getExercises().isEmpty()) {
-            response.append("Exercises:\n");
+            response.append(BotText.trainingDayExercisesLabel(language)).append("\n");
             for (int i = 0; i < trainingDay.getExercises().size(); i++) {
                 Exercise exercise = trainingDay.getExercises().get(i);
                 response.append(i + 1).append(". ").append(escapeHtml(exercise.getName())).append("\n");
@@ -41,11 +46,14 @@ final class TrainingDayMessageFormatter {
                 response.append("\n");
 
                 if (exercise.getNotes() != null && !exercise.getNotes().isEmpty()) {
-                    response.append("   Notes: ").append(escapeHtml(exercise.getNotes())).append("\n");
+                    response.append("   ")
+                            .append(BotText.trainingDayNotesLabel(language))
+                            .append(escapeHtml(exercise.getNotes()))
+                            .append("\n");
                 }
 
                 if (exercise.getVideoUrls() != null && !exercise.getVideoUrls().isEmpty()) {
-                    response.append("   Videos:\n");
+                    response.append("   ").append(BotText.trainingDayVideosLabel(language)).append("\n");
                     for (String url : exercise.getVideoUrls()) {
                         response.append("   - ").append(escapeHtml(url)).append("\n");
                     }
@@ -54,7 +62,7 @@ final class TrainingDayMessageFormatter {
                 response.append("\n");
             }
         } else {
-            response.append("No exercises defined for this training day.\n");
+            response.append(BotText.trainingDayNoExercises(language)).append("\n");
         }
 
         return response.toString();

@@ -2,6 +2,8 @@ package com.example.fitnessbot.model;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.time.LocalDateTime;
 
 @Entity
@@ -35,6 +37,17 @@ public class WorkoutSession {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(name = "revisiting_skipped_exercises", nullable = false)
+    private Boolean revisitingSkippedExercises = Boolean.FALSE;
+
+    @ElementCollection
+    @CollectionTable(
+            name = "workout_session_skipped_steps",
+            joinColumns = @JoinColumn(name = "workout_session_id")
+    )
+    @OrderColumn(name = "queue_position")
+    private List<SkippedWorkoutStep> skippedSteps = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -98,5 +111,21 @@ public class WorkoutSession {
 
     public void setCompletedAt(LocalDateTime completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public Boolean getRevisitingSkippedExercises() {
+        return revisitingSkippedExercises;
+    }
+
+    public void setRevisitingSkippedExercises(Boolean revisitingSkippedExercises) {
+        this.revisitingSkippedExercises = revisitingSkippedExercises;
+    }
+
+    public List<SkippedWorkoutStep> getSkippedSteps() {
+        return skippedSteps;
+    }
+
+    public void setSkippedSteps(List<SkippedWorkoutStep> skippedSteps) {
+        this.skippedSteps = skippedSteps;
     }
 }

@@ -318,6 +318,121 @@ class WorkoutServiceTest {
     }
 
     @Test
+    void skippedExerciseReturnsBeforeTrainingDayCompletes() throws Exception {
+        TrainingDay trainingDay = trainingDayWithExercises();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise bench = trainingDay.getExercises().getFirst();
+        Exercise row = trainingDay.getExercises().get(1);
+        WorkoutSession session = activeSession(user, trainingDay, bench);
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WeightEntryResult skipped = workoutService.skipCurrentExercise(TELEGRAM_USER_ID);
+
+        assertThat(skipped.accepted()).isTrue();
+        assertThat(skipped.dayCompleted()).isFalse();
+        assertThat(skipped.message()).isEqualTo("Skipped exercise. Next exercise:");
+        assertThat(session.getCurrentExercise()).isEqualTo(row);
+        assertThat(session.getCurrentSetNumber()).isEqualTo(1);
+        assertThat(session.getSkippedSteps()).hasSize(1);
+        assertThat(session.getSkippedSteps().getFirst().getExerciseId()).isEqualTo(bench.getId());
+        assertThat(session.getSkippedSteps().getFirst().getSetNumber()).isEqualTo(1);
+        assertThat(session.getSkippedSteps().getFirst().getReplayWholeExercise()).isTrue();
+
+        WorkoutService.WeightEntryResult rowResult = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "42");
+
+        assertThat(rowResult.accepted()).isTrue();
+        assertThat(rowResult.dayCompleted()).isFalse();
+        assertThat(rowResult.message()).isEqualTo("Saved set 1: 42 kg. Returning to skipped exercise:");
+        assertThat(session.getCurrentExercise()).isEqualTo(bench);
+        assertThat(session.getCurrentSetNumber()).isEqualTo(1);
+        assertThat(session.getRevisitingSkippedExercises()).isTrue();
+        assertThat(rowResult.exerciseView().exerciseName()).isEqualTo("Bench Press");
+        assertThat(rowResult.exerciseView().currentSetNumber()).isEqualTo(1);
+
+        WorkoutService.WeightEntryResult benchSetOne = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "60");
+        assertThat(benchSetOne.dayCompleted()).isFalse();
+        assertThat(benchSetOne.message()).isEqualTo("Saved set 1: 60 kg.");
+        assertThat(session.getCurrentSetNumber()).isEqualTo(2);
+
+        WorkoutService.WeightEntryResult benchSetTwo = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "60");
+        assertThat(benchSetTwo.dayCompleted()).isFalse();
+        assertThat(benchSetTwo.message()).isEqualTo("Saved set 2: 60 kg.");
+        assertThat(session.getCurrentSetNumber()).isEqualTo(3);
+
+        WorkoutService.WeightEntryResult completed = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "60");
+
+        assertThat(completed.dayCompleted()).isTrue();
+        assertThat(completed.message()).isEqualTo("Saved set 3: 60 kg. Training day completed.");
+        assertThat(session.getStatus()).isEqualTo(WorkoutSessionStatus.COMPLETED);
+        assertThat(session.getSkippedSteps()).isEmpty();
+        assertThat(session.getRevisitingSkippedExercises()).isFalse();
+    }
+
+    @Test
+    void skippedCircuitRoundReturnsWithoutReplayingWholeCircuit() throws Exception {
+        TrainingDay trainingDay = trainingDayWithCircuit();
+        User user = userWithActiveTrainingDay(trainingDay);
+        Exercise firstCircuitExercise = trainingDay.getExercises().get(1);
+        WorkoutSession session = activeSession(user, trainingDay, firstCircuitExercise);
+        List<WorkoutSetLog> currentSessionLogs = new ArrayList<>();
+
+        when(userRepository.findByTelegramId(TELEGRAM_USER_ID)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(1L, WorkoutSessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        doAnswer(invocation -> {
+            WorkoutSetLog savedLog = invocation.getArgument(0);
+            currentSessionLogs.add(savedLog);
+            return savedLog;
+        }).when(workoutSetLogRepository).save(any(WorkoutSetLog.class));
+        when(workoutSetLogRepository.findByWorkoutSessionIdAndExerciseIdOrderBySetNumberAsc(eq(100L), anyLong()))
+                .thenAnswer(invocation -> {
+                    Long exerciseId = invocation.getArgument(1);
+                    return currentSessionLogs.stream()
+                            .filter(log -> exerciseId.equals(log.getExercise().getId()))
+                            .toList();
+                });
+        when(workoutSetLogRepository.findHistoryLogsForExerciseIdentity(anyLong(), anyLong(), any(), anyLong(), any()))
+                .thenReturn(List.of());
+
+        WorkoutService.WeightEntryResult skipped = workoutService.skipCurrentExercise(TELEGRAM_USER_ID);
+        assertCurrentStep(skipped, session, "B", 1, true, 3);
+        assertThat(session.getSkippedSteps()).hasSize(1);
+        assertThat(session.getSkippedSteps().getFirst().getExerciseId()).isEqualTo(firstCircuitExercise.getId());
+        assertThat(session.getSkippedSteps().getFirst().getSetNumber()).isEqualTo(1);
+        assertThat(session.getSkippedSteps().getFirst().getReplayWholeExercise()).isFalse();
+
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "C", 1, true, 3);
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "A", 2, true, 3);
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "B", 2, true, 3);
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "C", 2, true, 3);
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "A", 3, true, 3);
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "B", 3, true, 3);
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "C", 3, true, 3);
+        assertCurrentStep(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"), session, "After Circuit", 1, false, 1);
+
+        WorkoutService.WeightEntryResult revisit = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none");
+
+        assertThat(revisit.dayCompleted()).isFalse();
+        assertThat(revisit.message()).isEqualTo("Saved set 1: no load. Returning to skipped exercise:");
+        assertThat(session.getCurrentExercise().getName()).isEqualTo("A");
+        assertThat(session.getCurrentSetNumber()).isEqualTo(1);
+        assertThat(session.getRevisitingSkippedExercises()).isTrue();
+
+        WorkoutService.WeightEntryResult completed = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none");
+
+        assertThat(completed.dayCompleted()).isTrue();
+        assertThat(completed.message()).isEqualTo("Saved round 1: no load. Training day completed.");
+        assertThat(session.getCurrentExercise().getName()).isEqualTo("A");
+        assertThat(session.getSkippedSteps()).isEmpty();
+        assertThat(session.getRevisitingSkippedExercises()).isFalse();
+    }
+
+    @Test
     void recordWeightRejectsBlankInput() throws WorkoutException {
         WorkoutService.WeightEntryResult result = workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "   ");
 

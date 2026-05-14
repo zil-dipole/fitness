@@ -2,7 +2,9 @@ package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.model.Exercise;
 import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.model.UserLanguage;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.service.WorkoutService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -169,7 +171,7 @@ class WorkoutCallbackHandlerTest {
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
         assertThat(response.getText()).contains("✅ <b>Training day complete</b>");
-        assertThat(response.getText()).contains("Saved set 3: Grey green band. Training day completed.");
+        assertThat(response.getText()).contains("<b>Grey green band saved</b> · set 3");
         assertThat(response.getText()).contains("Next: <b>Lower Body</b>");
         assertThat(response.getText()).contains("Week 2 is ready.");
         assertThat(response.getText()).doesNotContain("Exercises:");
@@ -201,9 +203,28 @@ class WorkoutCallbackHandlerTest {
 
         assertThat(response.getParseMode()).isEqualTo("HTML");
         assertThat(response.getText()).contains("✅ <b>Training day complete</b>");
-        assertThat(response.getText()).contains("Saved set 3: no load. Training day completed.");
+        assertThat(response.getText()).contains("<b>no load saved</b> · set 3");
         assertThat(response.getText()).doesNotContain("Next:");
         assertThat(response.getReplyMarkup()).isNull();
+    }
+
+    @Test
+    void completedWorkoutResultUsesRussianFinishScreenWhenSelected() throws Exception {
+        UserLanguageService languageService = mock(UserLanguageService.class);
+        when(languageService.getLanguage(TELEGRAM_USER_ID)).thenReturn(UserLanguage.RUSSIAN);
+        WorkoutCallbackHandler russianHandler = new WorkoutCallbackHandler(workoutService, programService, languageService);
+        when(workoutService.recordWeightForCurrentSet(TELEGRAM_USER_ID, "none"))
+                .thenReturn(new WorkoutService.WeightEntryResult(true, true, "Saved set 3: no load. Training day completed.", null));
+        when(programService.advanceActiveTrainingDayForUser(TELEGRAM_USER_ID)).thenReturn(nextTrainingDayProgression(2, false, false));
+
+        SendMessage response = russianHandler.handle(update(WorkoutMessageFormatter.NO_LOAD_CALLBACK));
+
+        assertThat(response.getParseMode()).isEqualTo("HTML");
+        assertThat(response.getText()).contains("✅ <b>Тренировочный день завершён</b>");
+        assertThat(response.getText()).contains("<b>без веса сохранено</b> · подход 3");
+        assertThat(response.getText()).contains("Дальше: <b>Lower Body</b>");
+        assertThat(response.getText()).contains("Неделя 2 готова.");
+        assertThat(response.getReplyMarkup()).isInstanceOf(InlineKeyboardMarkup.class);
     }
 
     private WorkoutService.WorkoutExerciseView exerciseView() {

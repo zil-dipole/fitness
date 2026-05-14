@@ -1,5 +1,6 @@
 package com.example.fitnessbot.telegram.commands;
 
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -18,12 +19,22 @@ public class HelpCommandHandler implements CommandHandler {
     public static final String COMMAND = "/help";
     private final CommandRegistryService commandRegistryService;
     private final MenuKeyboardFactory menuKeyboardFactory;
+    private final UserLanguageService languageService;
 
     @Autowired
     public HelpCommandHandler(CommandRegistryService commandRegistryService,
-                             MenuKeyboardFactory menuKeyboardFactory) {
+                              MenuKeyboardFactory menuKeyboardFactory,
+                              UserLanguageService languageService) {
         this.commandRegistryService = commandRegistryService;
         this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = languageService;
+    }
+
+    public HelpCommandHandler(CommandRegistryService commandRegistryService,
+                              MenuKeyboardFactory menuKeyboardFactory) {
+        this.commandRegistryService = commandRegistryService;
+        this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = null;
     }
 
     @Override
@@ -35,45 +46,13 @@ public class HelpCommandHandler implements CommandHandler {
     public SendMessage handle(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
+        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
 
-        StringBuilder helpText = new StringBuilder();
-        helpText.append("<b>How it works</b>\n");
-        helpText.append("1. Start a program with <code>/create_program &lt;name&gt;</code> or use the menu.\n");
-        helpText.append("2. Forward each training day message you want to save.\n");
-        helpText.append("3. Finish the program, then open it any time from <code>/show_program</code>.\n\n");
-
-        helpText.append("<b>Message format I can read</b>\n");
-        helpText.append("• Section headers ending with <code>:</code>\n");
-        helpText.append("• Exercise lines starting with <code>-</code> or <code>⁃</code>\n");
-        helpText.append("• Sets and reps like <code>3 x 10</code>\n");
-        helpText.append("• Video links on separate lines\n\n");
-
-        helpText.append("<b>Commands</b>\n");
         List<CommandMetadata> commands = commandRegistryService.getAllCommands().stream()
                 .sorted(Comparator.comparing(CommandMetadata::getCommand))
                 .toList();
-        for (CommandMetadata cmd : commands) {
-            helpText.append("• <b>")
-                    .append(TrainingDayMessageFormatter.escapeHtml(cmd.getCommand()))
-                    .append("</b> - ")
-                    .append(TrainingDayMessageFormatter.escapeHtml(cmd.getDescription()))
-                    .append("\n");
-            if (cmd.getUsageExample() != null && !cmd.getUsageExample().isEmpty() &&
-                !cmd.getUsageExample().equals(cmd.getCommand())) {
-                helpText.append("  Example: <code>")
-                        .append(TrainingDayMessageFormatter.escapeHtml(cmd.getUsageExample()))
-                        .append("</code>\n");
-            }
-        }
 
-        helpText.append("\n<b>Example message</b>\n");
-        helpText.append("<pre>Upper Body:\n");
-        helpText.append("- Bench Press 3 x 10\n");
-        helpText.append("- Pull-Ups 3 x 8\n");
-        helpText.append("- https://youtube.com/watch?v=example</pre>\n");
-        helpText.append("Type <code>/</code> to see all available commands, or use <code>/menu</code> to return to the main actions.");
-
-        sendMessage.setText(helpText.toString());
+        sendMessage.setText(BotText.helpText(language, commands));
         sendMessage.setParseMode("HTML");
         sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(update.getMessage().getFrom().getId()));
         return sendMessage;
@@ -86,6 +65,6 @@ public class HelpCommandHandler implements CommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Show help";
+        return BotText.commandDescription(COMMAND, null);
     }
 }

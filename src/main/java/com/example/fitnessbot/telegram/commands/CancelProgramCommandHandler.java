@@ -1,7 +1,9 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -15,11 +17,22 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
     public static final String COMMAND = "/cancel_program";
     private final ProgramCreationSessionManager sessionManager;
     private final MenuKeyboardFactory menuKeyboardFactory;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public CancelProgramCommandHandler(ProgramCreationSessionManager sessionManager,
+                                       MenuKeyboardFactory menuKeyboardFactory,
+                                       UserLanguageService languageService) {
+        this.sessionManager = sessionManager;
+        this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = languageService;
+    }
 
     public CancelProgramCommandHandler(ProgramCreationSessionManager sessionManager,
                                       MenuKeyboardFactory menuKeyboardFactory) {
         this.sessionManager = sessionManager;
         this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = null;
     }
 
     @Override
@@ -36,19 +49,21 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("There isn't a program draft to cancel.");
+        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
+        response.setText(BotText.cancelProgramNoSession(language));
         return response;
     }
 
     @Override
     public SendMessage handle(Update update) {
         Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
 
         // Check if user has an active session
         if (!sessionManager.hasActiveSession(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("There isn't a program draft to cancel.");
+            response.setText(BotText.cancelProgramNoSession(language));
             return response;
         }
 
@@ -57,7 +72,7 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
 
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("✅ Program draft cancelled.");
+        response.setText(BotText.cancelProgramSuccess(language));
         response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
         return response;
     }
@@ -69,6 +84,6 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Cancel program creation";
+        return BotText.commandDescription(COMMAND, null);
     }
 }

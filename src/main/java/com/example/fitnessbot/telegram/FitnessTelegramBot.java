@@ -3,21 +3,25 @@ package com.example.fitnessbot.telegram;
 import com.example.fitnessbot.exception.TrainingDayException;
 import com.example.fitnessbot.exception.ProgramException;
 import com.example.fitnessbot.model.TrainingDay;
+import com.example.fitnessbot.model.UserLanguage;
 import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramRenameSessionManager;
 import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.commands.CallbackQueryHandler;
 import com.example.fitnessbot.telegram.commands.CommandHandler;
 import com.example.fitnessbot.telegram.commands.CommandMetadata;
 import com.example.fitnessbot.telegram.commands.CommandRegistryService;
 import com.example.fitnessbot.telegram.commands.ContextAwareCommandHandler;
+import com.example.fitnessbot.telegram.commands.BotText;
 import com.example.fitnessbot.telegram.commands.WorkoutMessageFormatter;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -54,9 +58,11 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private final List<CallbackQueryHandler> callbackQueryHandlers;
     private final CommandRegistryService commandRegistryService;
     private final MenuKeyboardFactory menuKeyboardFactory;
+    private final UserLanguageService languageService;
 
     private final String botUsername;
 
+    @Autowired
     public FitnessTelegramBot(TrainingDayService trainingDayService,
                               WorkoutService workoutService,
                               ProgramService programService,
@@ -66,6 +72,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                               List<CallbackQueryHandler> callbackQueryHandlers,
                               CommandRegistryService commandRegistryService,
                               MenuKeyboardFactory menuKeyboardFactory,
+                              UserLanguageService languageService,
                               @Value("${telegram.bot.token:}") String botToken,
                               @Value("${telegram.bot.username:}") String botUsername) {
         super(botToken);
@@ -78,7 +85,35 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         this.callbackQueryHandlers = callbackQueryHandlers;
         this.commandRegistryService = commandRegistryService;
         this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = languageService;
         this.botUsername = botUsername;
+    }
+
+    public FitnessTelegramBot(TrainingDayService trainingDayService,
+                              WorkoutService workoutService,
+                              ProgramService programService,
+                              ProgramCreationSessionManager sessionManager,
+                              ProgramRenameSessionManager renameSessionManager,
+                              List<CommandHandler> commandHandlers,
+                              List<CallbackQueryHandler> callbackQueryHandlers,
+                              CommandRegistryService commandRegistryService,
+                              MenuKeyboardFactory menuKeyboardFactory,
+                              @Value("${telegram.bot.token:}") String botToken,
+                              @Value("${telegram.bot.username:}") String botUsername) {
+        this(
+                trainingDayService,
+                workoutService,
+                programService,
+                sessionManager,
+                renameSessionManager,
+                commandHandlers,
+                callbackQueryHandlers,
+                commandRegistryService,
+                menuKeyboardFactory,
+                null,
+                botToken,
+                botUsername
+        );
     }
 
 
@@ -89,10 +124,13 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        List<BotCommand> commands = createTelegramCommandMenu();
+        List<BotCommand> commands = createTelegramCommandMenu(UserLanguage.ENGLISH);
+        List<BotCommand> russianCommands = createTelegramCommandMenu(UserLanguage.RUSSIAN);
         try {
             execute(new SetMyCommands(commands, new BotCommandScopeDefault(), null));
             execute(new SetMyCommands(commands, new BotCommandScopeAllPrivateChats(), null));
+            execute(new SetMyCommands(russianCommands, new BotCommandScopeDefault(), UserLanguage.RUSSIAN.getCode()));
+            execute(new SetMyCommands(russianCommands, new BotCommandScopeAllPrivateChats(), UserLanguage.RUSSIAN.getCode()));
             log.info("Registered Telegram command menu with {} globally visible commands", commands.size());
         } catch (Exception e) {
             log.warn("Failed to register Telegram command menu", e);
@@ -131,6 +169,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
         String callbackData = callbackQuery.getData();
         Long chatId = callbackQuery.getMessage().getChatId();
+        var language = BotText.language(languageService, callbackQuery.getFrom().getId());
 
         try {
             // First, try to handle with registered callback query handlers
@@ -174,6 +213,10 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     handleCommandCallback(callbackQuery, "/help");
                     acknowledgeCallbackQuery(callbackQuery, null);
                     return;
+                case "language":
+                    handleCommandCallback(callbackQuery, "/language");
+                    acknowledgeCallbackQuery(callbackQuery, null);
+                    return;
                 case "start_menu":
                     handleCommandCallback(callbackQuery, "/menu");
                     acknowledgeCallbackQuery(callbackQuery, null);
@@ -193,7 +236,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                         handleCommandSuggestion(callbackQuery);
                         return; // We've handled the callback, so we can return early
                     } else {
-                        message.setText("I couldn't understand that button action. Please try again.");
+                        message.setText(BotText.callbackUnknown(language));
                     }
                     break;
             }
@@ -206,7 +249,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             try {
                 SendMessage errorMessage = new SendMessage();
                 errorMessage.setChatId(chatId.toString());
-                errorMessage.setText("Sorry, there was an error processing your request. Please try again.");
+                errorMessage.setText(BotText.callbackError(language));
                 sendTelegramMessage(errorMessage);
 
                 acknowledgeCallbackQuery(callbackQuery, null);
@@ -224,7 +267,8 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         String callbackData = callbackQuery.getData();
         String command = callbackData.substring(4); // Remove "cmd:" prefix
 
-        acknowledgeCallbackQuery(callbackQuery, "Executing: " + command);
+        var language = BotText.language(languageService, callbackQuery.getFrom().getId());
+        acknowledgeCallbackQuery(callbackQuery, BotText.executingCommand(command, language));
         handleCommandCallback(callbackQuery, command);
     }
 
@@ -261,6 +305,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private void handleForwardedMessage(Update update) {
         Long userId = update.getMessage().getFrom().getId();
         String messageText = update.getMessage().getText();
+        var language = BotText.language(languageService, userId);
 
         // Check if user is in a program creation session
         if (sessionManager.hasActiveSession(userId)) {
@@ -275,9 +320,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("✅ Training day saved.\n" +
-                    "Parsed " + trainingDay.getExercises().size() + " exercise" +
-                    (trainingDay.getExercises().size() == 1 ? "" : "s") + ".");
+            sendMessage.setText(BotText.trainingDaySaved(trainingDay.getExercises().size(), language));
 
             sendTelegramMessage(sendMessage);
         } catch (IllegalArgumentException e) {
@@ -285,7 +328,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ I couldn't use that message.\n" + e.getMessage());
+            sendMessage.setText(BotText.invalidTrainingDayMessage(language) + e.getMessage());
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -297,7 +340,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ I couldn't parse that training day.\n" + e.getMessage());
+            sendMessage.setText(BotText.parseTrainingDayError(language) + e.getMessage());
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -309,7 +352,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ I couldn't save that training day because of a database error.\nPlease try again.");
+            sendMessage.setText(BotText.databaseTrainingDayError(language));
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -321,7 +364,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ Something went wrong while saving that training day.\nPlease try again.");
+            sendMessage.setText(BotText.unexpectedTrainingDaySaveError(language));
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -338,6 +381,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private void handleTrainingDayMessageDuringProgramCreation(Update update) {
         Long userId = update.getMessage().getFrom().getId();
         String messageText = update.getMessage().getText();
+        var language = BotText.language(languageService, userId);
 
         try {
             TrainingDay trainingDay = trainingDayService.processForwardedMessage(userId, messageText);
@@ -348,13 +392,14 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
             String trainingDayTitle = trainingDay.getTitle() == null || trainingDay.getTitle().isBlank()
-                    ? "Training day"
+                    ? BotText.fallbackTrainingDayTitle(language)
                     : "\"" + trainingDay.getTitle().trim() + "\"";
-            sendMessage.setText("✅ Added " + trainingDayTitle + " to \"" + session.getProgram().getName() + "\".\n" +
-                    session.getTrainingDaysCount() + " training " +
-                    (session.getTrainingDaysCount() == 1 ? "day" : "days") +
-                    " in this draft.\n\n" +
-                    "Send or forward another day, or tap \"Finish Program\" when you're done.");
+            sendMessage.setText(BotText.addedTrainingDayToDraft(
+                    trainingDayTitle,
+                    session.getProgram().getName(),
+                    session.getTrainingDaysCount(),
+                    language
+            ));
             sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
 
             sendTelegramMessage(sendMessage);
@@ -363,7 +408,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ I couldn't use that training day.\n" + e.getMessage());
+            sendMessage.setText(BotText.invalidTrainingDayDuringProgram(language) + e.getMessage());
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -375,7 +420,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ I couldn't parse that training day.\n" + e.getMessage());
+            sendMessage.setText(BotText.parseTrainingDayError(language) + e.getMessage());
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -387,7 +432,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(update.getMessage().getChatId().toString());
-            sendMessage.setText("❌ I couldn't add that training day to your draft.\nPlease try again.");
+            sendMessage.setText(BotText.addTrainingDayToDraftError(language));
 
             try {
                 sendTelegramMessage(sendMessage);
@@ -399,6 +444,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private void handlePlainTextMessage(Update update) {
         Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
         if (sessionManager.hasActiveSession(userId)) {
             handleTrainingDayMessageDuringProgramCreation(update);
             return;
@@ -420,17 +466,24 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                     userId,
                     update.getMessage().getText()
             );
-            if (result.dayCompleted() || !result.accepted()) {
-                response.setText(result.message());
-            } else {
-                response.setText(WorkoutMessageFormatter.formatExerciseResult(result.message(), result.exerciseView()));
+            if (result.dayCompleted()) {
+                ProgramService.ActiveTrainingDayProgression progression = programService.advanceActiveTrainingDayForUser(userId);
+                response.setText(WorkoutMessageFormatter.formatFinishScreen(result.message(), progression, language));
                 response.setParseMode("HTML");
-                response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard(result.exerciseView()));
+                if (progression != null && progression.trainingDay() != null) {
+                    response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard(language));
+                }
+            } else if (!result.accepted()) {
+                response.setText(localizeWorkoutServiceMessage(result.message(), language));
+            } else {
+                response.setText(WorkoutMessageFormatter.formatExerciseResult(result.message(), result.exerciseView(), language));
+                response.setParseMode("HTML");
+                response.setReplyMarkup(WorkoutMessageFormatter.exerciseKeyboard(result.exerciseView(), language));
             }
 
             sendTelegramMessage(response);
         } catch (WorkoutException e) {
-            response.setText(e.getMessage());
+            response.setText(localizeWorkoutServiceMessage(e.getMessage(), language));
             try {
                 sendTelegramMessage(response);
             } catch (Exception telegramApiException) {
@@ -438,7 +491,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             }
         } catch (Exception e) {
             log.error("Failed to handle workout input for user {}", userId, e);
-            response.setText("Sorry, there was an error saving your workout set.");
+            response.setText(BotText.workoutSaveError(language));
             try {
                 sendTelegramMessage(response);
             } catch (Exception telegramApiException) {
@@ -447,31 +500,55 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private String localizeWorkoutServiceMessage(String message, com.example.fitnessbot.model.UserLanguage language) {
+        if ("No previous load is available for this exercise.".equals(message)) {
+            return BotText.workoutNoPreviousLoad(language);
+        }
+        if ("You don't have an active workout session.".equals(message)) {
+            return BotText.workoutNoActiveSession(language);
+        }
+        if ("You don't have an active training day.".equals(message)) {
+            return BotText.workoutNoActiveTrainingDay(language);
+        }
+        if ("Active training day has no exercises.".equals(message)) {
+            return BotText.workoutTrainingDayNoExercises(language);
+        }
+        if ("Current workout exercise is missing.".equals(message)) {
+            return BotText.workoutCurrentExerciseMissing(language);
+        }
+        if (message != null && message.startsWith("👉 Send load for this set")) {
+            return BotText.workoutLoadPrompt(BotText.workoutStepLabel(false, false, language), 1, language);
+        }
+        return message;
+    }
+
     private SendMessage buildRenameProgramPrompt(CallbackQuery callbackQuery) {
         SendMessage response = new SendMessage();
         response.setChatId(callbackQuery.getMessage().getChatId().toString());
+        var language = BotText.language(languageService, callbackQuery.getFrom().getId());
 
         Long programId;
         try {
             programId = Long.parseLong(callbackQuery.getData().substring("rename_program:".length()));
         } catch (NumberFormatException e) {
-            response.setText("Invalid program ID.");
+            response.setText(BotText.invalidProgramId(language));
             return response;
         }
 
         var program = programService.getProgramForUser(programId, callbackQuery.getFrom().getId());
         if (program.isEmpty()) {
-            response.setText("I couldn't find that program.");
+            response.setText(BotText.programNotFound(language));
             return response;
         }
 
         renameSessionManager.startRename(callbackQuery.getFrom().getId(), programId);
-        response.setText("Send the new name for \"" + program.get().getName() + "\".");
+        response.setText(BotText.renameProgramPrompt(program.get().getName(), language));
         return response;
     }
 
     private void handleProgramRenameMessage(Update update) {
         Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
         Long programId = renameSessionManager.getProgramId(userId);
         if (programId == null) {
             renameSessionManager.endRename(userId);
@@ -484,18 +561,22 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         try {
             var program = programService.renameProgramForUser(programId, userId, update.getMessage().getText());
             renameSessionManager.endRename(userId);
-            response.setText("✅ Program renamed to \"" + program.getName() + "\".\n\nUse /show_program " + program.getId() + " to open it.");
+            response.setText(BotText.programRenamed(program.getName(), program.getId(), language));
         } catch (ProgramException e) {
             if ("Program name can't be empty.".equals(e.getMessage())) {
-                response.setText("Program name can't be empty.\n\nSend a new name.");
+                response.setText(BotText.emptyProgramName(language));
             } else {
                 renameSessionManager.endRename(userId);
-                response.setText(e.getMessage());
+                if ("Program not found.".equals(e.getMessage())) {
+                    response.setText(BotText.programNotFound(language));
+                } else {
+                    response.setText(e.getMessage());
+                }
             }
         } catch (Exception e) {
             renameSessionManager.endRename(userId);
             log.error("Failed to rename program for user {}", userId, e);
-            response.setText("I couldn't rename that program.\nPlease try again.");
+            response.setText(BotText.renameProgramError(language));
         }
 
         try {
@@ -507,6 +588,8 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     private void handleCommand(Update update) {
         String command = update.getMessage().getText();
+        Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
 
         // Check for slash command to show all available commands
         if ("/".equals(command)) {
@@ -539,7 +622,6 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             if (handler != null) {
                 // Check if it's a context-aware handler and if it's available
                 if (handler instanceof ContextAwareCommandHandler contextAwareHandler) {
-                    Long userId = update.getMessage().getFrom().getId();
                     if (!contextAwareHandler.isAvailable(userId, sessionManager)) {
                         response = contextAwareHandler.handleUnavailable(update);
                     } else {
@@ -551,7 +633,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             } else {
                 response = new SendMessage();
                 response.setChatId(update.getMessage().getChatId().toString());
-                response.setText("I don't recognize that command.\n\nSend /help to see what I can do.");
+                response.setText(BotText.unknownCommand(language));
             }
 
             if (response != null) {
@@ -563,7 +645,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             try {
                 SendMessage errorMessage = new SendMessage();
                 errorMessage.setChatId(update.getMessage().getChatId().toString());
-                errorMessage.setText("I couldn't process that command.\nPlease try again.");
+                errorMessage.setText(BotText.commandProcessingError(language));
                 sendTelegramMessage(errorMessage);
             } catch (Exception telegramApiException) {
                 log.error("Failed to send error message to user", telegramApiException);
@@ -576,9 +658,10 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
      */
     private void showAllCommands(Update update) {
         Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
         SendMessage message = new SendMessage();
         message.setChatId(update.getMessage().getChatId().toString());
-        message.setText("Choose a command:");
+        message.setText(BotText.chooseCommand(language));
 
         // Filter commands to only include available commands for context-aware handlers
         List<CommandMetadata> availableCommands = commandRegistryService.getAllCommands().stream()
@@ -601,6 +684,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
      */
     private void showCommandSuggestions(Update update, String partialCommand) {
         Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
         List<CommandMetadata> suggestions = commandRegistryService.findCommandsByPrefix(partialCommand);
 
         // If no prefix matches, try similarity search
@@ -616,7 +700,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         if (!suggestions.isEmpty()) {
             SendMessage message = new SendMessage();
             message.setChatId(update.getMessage().getChatId().toString());
-            message.setText("Did you mean one of these commands?");
+            message.setText(BotText.commandSuggestions(language));
 
             // Create inline keyboard with suggested commands
             InlineKeyboardMarkup markup = createCommandKeyboard(suggestions);
@@ -631,7 +715,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
             // No suggestions, send unknown command message
             SendMessage message = new SendMessage();
             message.setChatId(update.getMessage().getChatId().toString());
-            message.setText("I don't recognize that command.\n\nSend /help to see what I can do.");
+            message.setText(BotText.unknownCommand(language));
 
             try {
                 sendTelegramMessage(message);
@@ -691,13 +775,18 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     }
 
     List<BotCommand> createTelegramCommandMenu() {
+        return createTelegramCommandMenu(UserLanguage.ENGLISH);
+    }
+
+    List<BotCommand> createTelegramCommandMenu(UserLanguage language) {
         return List.of(
-                new BotCommand("start", "Start the bot"),
-                new BotCommand("help", "Show help"),
-                new BotCommand("menu", "Show main menu"),
-                new BotCommand("create_program", "Create a workout program"),
-                new BotCommand("show_program", "Show saved programs"),
-                new BotCommand("active_day", "Show active training day")
+                new BotCommand("start", BotText.commandDescription("start", language)),
+                new BotCommand("help", BotText.commandDescription("help", language)),
+                new BotCommand("menu", BotText.commandDescription("menu", language)),
+                new BotCommand("language", BotText.commandDescription("language", language)),
+                new BotCommand("create_program", BotText.commandDescription("create_program", language)),
+                new BotCommand("show_program", BotText.commandDescription("show_program", language)),
+                new BotCommand("active_day", BotText.commandDescription("active_day", language))
         );
     }
 

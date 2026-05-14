@@ -40,6 +40,10 @@ public class User {
     @Column(name = "active_program_week", nullable = false)
     private Integer activeProgramWeek = 1;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "language", nullable = false)
+    private UserLanguage language = UserLanguage.ENGLISH;
+
     public Long getId() {
         return id;
     }
@@ -134,5 +138,13 @@ public class User {
 
     public void setActiveProgramWeek(Integer activeProgramWeek) {
         this.activeProgramWeek = activeProgramWeek;
+    }
+
+    public UserLanguage getLanguage() {
+        return language == null ? UserLanguage.ENGLISH : language;
+    }
+
+    public void setLanguage(UserLanguage language) {
+        this.language = language == null ? UserLanguage.ENGLISH : language;
     }
 }

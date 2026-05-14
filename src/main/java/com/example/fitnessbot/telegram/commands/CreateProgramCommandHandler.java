@@ -5,7 +5,9 @@ import com.example.fitnessbot.exception.ProgramException;
 import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -20,6 +22,18 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
     private final MenuKeyboardFactory menuKeyboardFactory;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public CreateProgramCommandHandler(ProgramService programService,
+                                       ProgramCreationSessionManager sessionManager,
+                                       MenuKeyboardFactory menuKeyboardFactory,
+                                       UserLanguageService languageService) {
+        this.programService = programService;
+        this.sessionManager = sessionManager;
+        this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = languageService;
+    }
 
     public CreateProgramCommandHandler(ProgramService programService,
                                       ProgramCreationSessionManager sessionManager,
@@ -27,6 +41,7 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
         this.programService = programService;
         this.sessionManager = sessionManager;
         this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = null;
     }
 
     @Override
@@ -44,11 +59,8 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("""
-                You already have a program draft in progress.
-
-                Finish it with /finish_program or cancel it with /cancel_program.
-                """);
+        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
+        response.setText(BotText.createProgramUnavailable(language));
         return response;
     }
 
@@ -56,16 +68,13 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handle(Update update) {
         Long userId = update.getMessage().getFrom().getId();
         String messageText = update.getMessage().getText();
+        var language = BotText.language(languageService, userId);
 
         // Check if user already has an active session
         if (sessionManager.hasActiveSession(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("""
-                    You already have a program draft in progress.
-
-                    Finish it with /finish_program or cancel it with /cancel_program.
-                    """);
+            response.setText(BotText.createProgramUnavailable(language));
             return response;
         }
 
@@ -85,9 +94,7 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
 
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("✅ Program draft created: \"" + program.getName() + "\"\n\n" +
-                    "Send or forward the training day messages you want to include.\n" +
-                    "When you're done, tap \"Finish Program\" or send /finish_program.");
+            response.setText(BotText.programDraftCreated(program.getName(), language));
             response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
             return response;
         } catch (ProgramException e) {
@@ -98,7 +105,7 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
         } catch (Exception e) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("❌ Sorry, there was an error starting program creation. Please try again.");
+            response.setText(BotText.createProgramGenericError(language));
             return response;
         }
     }
@@ -110,6 +117,6 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Create training program";
+        return BotText.commandDescription(COMMAND, null);
     }
 }

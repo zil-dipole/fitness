@@ -6,7 +6,9 @@ import com.example.fitnessbot.exception.TrainingDayException;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -21,6 +23,18 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
     private final MenuKeyboardFactory menuKeyboardFactory;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public FinishProgramCommandHandler(ProgramService programService,
+                                       ProgramCreationSessionManager sessionManager,
+                                       MenuKeyboardFactory menuKeyboardFactory,
+                                       UserLanguageService languageService) {
+        this.programService = programService;
+        this.sessionManager = sessionManager;
+        this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = languageService;
+    }
 
     public FinishProgramCommandHandler(ProgramService programService,
                                       ProgramCreationSessionManager sessionManager,
@@ -28,6 +42,7 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
         this.programService = programService;
         this.sessionManager = sessionManager;
         this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = null;
     }
 
     @Override
@@ -44,19 +59,21 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        response.setText("There isn't a program draft in progress.\n\nStart one with /create_program <program_name>.");
+        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
+        response.setText(BotText.finishProgramNoSession(language));
         return response;
     }
 
     @Override
     public SendMessage handle(Update update) {
         Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
 
         // Check if user has an active session
         if (!sessionManager.hasActiveSession(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("There isn't a program draft in progress.\n\nStart one with /create_program <program_name>.");
+            response.setText(BotText.finishProgramNoSession(language));
             return response;
         }
 
@@ -70,7 +87,7 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
             if (trainingDays.isEmpty()) {
                 SendMessage response = new SendMessage();
                 response.setChatId(update.getMessage().getChatId().toString());
-                response.setText("⚠️ Your program draft is empty.\n\nForward at least one training day before finishing.");
+                response.setText(BotText.finishProgramEmpty(language));
                 return response;
             }
 
@@ -85,9 +102,7 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
 
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("✅ Program \"" + program.getName() + "\" is ready.\n" +
-                    "Added " + trainingDays.size() + " training " + (trainingDays.size() == 1 ? "day" : "days") + ".\n\n" +
-                    "Use /show_program to open it.");
+            response.setText(BotText.finishProgramSuccess(program.getName(), trainingDays.size(), language));
             response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
             return response;
         } catch (ProgramException | TrainingDayException e) {
@@ -98,7 +113,7 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
         } catch (Exception e) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText("❌ Sorry, there was an error finishing program creation. Please try again.");
+            response.setText(BotText.finishProgramGenericError(language));
             return response;
         }
     }
@@ -110,6 +125,6 @@ public class FinishProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Finish creating current program";
+        return BotText.commandDescription(COMMAND, null);
     }
 }

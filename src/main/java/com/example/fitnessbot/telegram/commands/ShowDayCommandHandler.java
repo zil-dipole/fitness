@@ -2,6 +2,8 @@ package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.TrainingDayService;
+import com.example.fitnessbot.service.UserLanguageService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,9 +17,18 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 public class ShowDayCommandHandler implements CallbackQueryHandler {
 
     private final TrainingDayService trainingDayService;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public ShowDayCommandHandler(TrainingDayService trainingDayService,
+                                 UserLanguageService languageService) {
+        this.trainingDayService = trainingDayService;
+        this.languageService = languageService;
+    }
 
     public ShowDayCommandHandler(TrainingDayService trainingDayService) {
         this.trainingDayService = trainingDayService;
+        this.languageService = null;
     }
 
     @Override
@@ -32,6 +43,7 @@ public class ShowDayCommandHandler implements CallbackQueryHandler {
         String data = callbackQuery.getData();
         Long chatId = callbackQuery.getMessage().getChatId();
         Long userId = callbackQuery.getFrom().getId();
+        var language = BotText.language(languageService, userId);
 
         // Extract training day ID from callback data
         Long trainingDayId;
@@ -40,7 +52,7 @@ public class ShowDayCommandHandler implements CallbackQueryHandler {
         } catch (NumberFormatException e) {
             SendMessage errorMessage = new SendMessage();
             errorMessage.setChatId(chatId.toString());
-            errorMessage.setText("Invalid training day ID.");
+            errorMessage.setText(BotText.showDayInvalidId(language));
             return errorMessage;
         }
 
@@ -50,7 +62,7 @@ public class ShowDayCommandHandler implements CallbackQueryHandler {
         if (trainingDay == null) {
             SendMessage errorMessage = new SendMessage();
             errorMessage.setChatId(chatId.toString());
-            errorMessage.setText("Training day not found.");
+            errorMessage.setText(BotText.showDayNotFound(language));
             return errorMessage;
         }
 
@@ -58,13 +70,13 @@ public class ShowDayCommandHandler implements CallbackQueryHandler {
         if (!trainingDay.getUser().getTelegramId().equals(userId)) {
             SendMessage errorMessage = new SendMessage();
             errorMessage.setChatId(chatId.toString());
-            errorMessage.setText("You don't have permission to view this training day.");
+            errorMessage.setText(BotText.showDayUnauthorized(language));
             return errorMessage;
         }
 
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId.toString());
-        sendMessage.setText(TrainingDayMessageFormatter.format(trainingDay));
+        sendMessage.setText(TrainingDayMessageFormatter.format(trainingDay, language));
         sendMessage.setParseMode("HTML");
 
         return sendMessage;

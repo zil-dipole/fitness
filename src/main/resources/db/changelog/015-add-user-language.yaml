@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-add-user-language
+      author: developer
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: language
+                  type: varchar(16)
+                  defaultValue: ENGLISH
+                  constraints:
+                    nullable: false

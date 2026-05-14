@@ -1,7 +1,9 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -15,9 +17,18 @@ public class MenuCommandHandler implements CommandHandler {
     public static final String COMMAND = "/menu";
     
     private final MenuKeyboardFactory menuKeyboardFactory;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public MenuCommandHandler(MenuKeyboardFactory menuKeyboardFactory,
+                              UserLanguageService languageService) {
+        this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = languageService;
+    }
 
     public MenuCommandHandler(MenuKeyboardFactory menuKeyboardFactory) {
         this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = null;
     }
 
     @Override
@@ -29,7 +40,8 @@ public class MenuCommandHandler implements CommandHandler {
     public SendMessage handle(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        sendMessage.setText("Choose what you'd like to do next:");
+        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
+        sendMessage.setText(BotText.mainMenuTitle(language));
         sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(update.getMessage().getFrom().getId()));
         return sendMessage;
     }
@@ -41,6 +53,6 @@ public class MenuCommandHandler implements CommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Show menu";
+        return BotText.commandDescription(COMMAND, null);
     }
 }

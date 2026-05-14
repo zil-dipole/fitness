@@ -1,7 +1,9 @@
 package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -16,9 +18,18 @@ public class StartCommandHandler implements ContextAwareCommandHandler {
     public static final String COMMAND = "/start";
     
     private final MenuKeyboardFactory menuKeyboardFactory;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public StartCommandHandler(MenuKeyboardFactory menuKeyboardFactory,
+                               UserLanguageService languageService) {
+        this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = languageService;
+    }
 
     public StartCommandHandler(MenuKeyboardFactory menuKeyboardFactory) {
         this.menuKeyboardFactory = menuKeyboardFactory;
+        this.languageService = null;
     }
 
     @Override
@@ -37,7 +48,8 @@ public class StartCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        sendMessage.setText("You're already set up.\n\nSend /menu to see what you can do next.");
+        var language = BotText.language(languageService, telegramUserId(update));
+        sendMessage.setText(BotText.startAlreadySetup(language));
         return sendMessage;
     }
 
@@ -45,16 +57,8 @@ public class StartCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handle(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        sendMessage.setText("""
-                Welcome to Fitness Bot.
-
-                Here is the easiest way to use it:
-                1. Create a program or open a saved one.
-                2. Forward each training day message you want to keep.
-                3. Open /active_day when you're ready to train.
-
-                Choose an option below to get started.
-                """);
+        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
+        sendMessage.setText(BotText.startWelcome(language));
         sendMessage.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(update.getMessage().getFrom().getId()));
         return sendMessage;
     }
@@ -66,6 +70,13 @@ public class StartCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Start bot";
+        return BotText.commandDescription(COMMAND, null);
+    }
+
+    private Long telegramUserId(Update update) {
+        if (update == null || update.getMessage() == null || update.getMessage().getFrom() == null) {
+            return null;
+        }
+        return update.getMessage().getFrom().getId();
     }
 }

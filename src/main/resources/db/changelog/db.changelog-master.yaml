@@ -23,3 +23,7 @@ databaseChangeLog:
       file: db/changelog/012-add-exercise-canonical-link.yaml
   - include:
       file: db/changelog/013-add-user-active-program-week.yaml
+  - include:
+      file: db/changelog/014-add-workout-session-skipped-steps.yaml
+  - include:
+      file: db/changelog/015-add-user-language.yaml

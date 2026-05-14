@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-add-workout-session-skipped-steps
+      author: codex
+      changes:
+        - addColumn:
+            tableName: workout_sessions
+            columns:
+              - column:
+                  name: revisiting_skipped_exercises
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: workout_session_skipped_steps
+            columns:
+              - column:
+                  name: workout_session_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_session_skipped_step_session
+                    references: workout_sessions(id)
+              - column:
+                  name: queue_position
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: exercise_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_workout_session_skipped_step_exercise
+                    references: exercises(id)
+              - column:
+                  name: set_number
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: replay_whole_exercise
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: workout_session_skipped_steps
+            columnNames: workout_session_id, queue_position
+            constraintName: pk_workout_session_skipped_steps

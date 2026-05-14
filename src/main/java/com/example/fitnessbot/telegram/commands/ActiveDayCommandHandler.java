@@ -2,6 +2,8 @@ package com.example.fitnessbot.telegram.commands;
 
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.UserLanguageService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -13,9 +15,18 @@ public class ActiveDayCommandHandler implements CommandHandler {
     public static final String COMMAND = "/active_day";
 
     private final ProgramService programService;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public ActiveDayCommandHandler(ProgramService programService,
+                                   UserLanguageService languageService) {
+        this.programService = programService;
+        this.languageService = languageService;
+    }
 
     public ActiveDayCommandHandler(ProgramService programService) {
         this.programService = programService;
+        this.languageService = null;
     }
 
     @Override
@@ -27,19 +38,21 @@ public class ActiveDayCommandHandler implements CommandHandler {
     @Override
     public SendMessage handle(Update update) {
         Long telegramUserId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, telegramUserId);
         TrainingDay activeTrainingDay = programService.getActiveTrainingDayForUser(telegramUserId);
         int weekNumber = programService.getActiveProgramWeekForUser(telegramUserId);
 
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
         if (activeTrainingDay == null) {
-            response.setText("You don't have an active program yet.\n\nOpen a saved program and tap Start Program.");
+            response.setText(BotText.activeProgramMissing(language));
             return response;
         }
 
-        response.setText("Week " + weekNumber + " - Active training day:\n\n" + TrainingDayMessageFormatter.format(activeTrainingDay));
+        response.setText(BotText.activeDayHeader(weekNumber, language)
+                + TrainingDayMessageFormatter.format(activeTrainingDay, language));
         response.setParseMode("HTML");
-        response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard());
+        response.setReplyMarkup(WorkoutMessageFormatter.startDayKeyboard(language));
         return response;
     }
 
@@ -50,6 +63,6 @@ public class ActiveDayCommandHandler implements CommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Show active training day";
+        return BotText.commandDescription(COMMAND, null);
     }
 }

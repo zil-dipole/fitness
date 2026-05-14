@@ -4,6 +4,8 @@ import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.UserLanguageService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -31,10 +33,21 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
+    private final UserLanguageService languageService;
+
+    @Autowired
+    public ShowProgramCommandHandler(ProgramService programService,
+                                     ProgramCreationSessionManager sessionManager,
+                                     UserLanguageService languageService) {
+        this.programService = programService;
+        this.sessionManager = sessionManager;
+        this.languageService = languageService;
+    }
 
     public ShowProgramCommandHandler(ProgramService programService, ProgramCreationSessionManager sessionManager) {
         this.programService = programService;
         this.sessionManager = sessionManager;
+        this.languageService = null;
     }
 
     @Override
@@ -51,7 +64,8 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
     public SendMessage handleUnavailable(Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(update.getMessage().getChatId().toString());
-        sendMessage.setText("Use /show_program to view saved programs or /create_program <name> to start a new one.");
+        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
+        sendMessage.setText(BotText.showProgramUnavailable(language));
         return sendMessage;
     }
 
@@ -62,17 +76,18 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         sendMessage.setChatId(update.getMessage().getChatId().toString());
 
         Long telegramUserId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, telegramUserId);
         String selector = extractSelector(update.getMessage().getText());
         Long requestedProgramId = extractProgramId(selector);
         if (requestedProgramId != null) {
-            return buildSavedProgramDetails(sendMessage, telegramUserId, requestedProgramId);
+            return buildSavedProgramDetails(sendMessage, telegramUserId, requestedProgramId, language);
         }
         if (hasInvalidProgramId(selector)) {
-            sendMessage.setText("Invalid program ID.\n\nUse /show_program <program_id>.");
+            sendMessage.setText(BotText.invalidProgramId(language));
             return sendMessage;
         }
         if (selector != null) {
-            return buildSavedProgramDetailsByName(sendMessage, telegramUserId, selector);
+            return buildSavedProgramDetailsByName(sendMessage, telegramUserId, selector, language);
         }
 
         StringBuilder response = new StringBuilder();
@@ -81,33 +96,25 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         var session = sessionManager.getSession(telegramUserId);
         if (session != null) {
             Program program = session.getProgram();
-            response.append("<b>Program Draft</b>\n")
-                    .append(TrainingDayMessageFormatter.escapeHtml(program.getName()))
-                    .append("</b>\n\n");
+            response.append(BotText.programDraftTitle(program.getName(), language));
 
             List<TrainingDay> trainingDays = session.getTrainingDays();
             if (!trainingDays.isEmpty()) {
-                response.append("<b>Training days added</b>\n");
+                response.append(BotText.trainingDaysAddedHeader(language));
                 for (TrainingDay trainingDay : trainingDays) {
                     response.append("• ")
                             .append(TrainingDayMessageFormatter.escapeHtml(trainingDay.getTitle()))
                             .append("\n");
                 }
 
-                response.append("\n")
-                        .append(trainingDays.size())
-                        .append(" training ")
-                        .append(trainingDays.size() == 1 ? "day" : "days")
-                        .append(" so far.\n");
-                response.append("Forward another training day, or tap Finish Program when you're done.");
+                response.append(BotText.draftProgress(trainingDays.size(), language));
             } else {
-                response.append("No training days added yet.\n");
-                response.append("Forward a training day message to start building this program.");
+                response.append(BotText.noTrainingDaysAdded(language));
             }
 
             sendMessage.setParseMode("HTML");
         } else {
-            return buildSavedProgramList(sendMessage, telegramUserId);
+            return buildSavedProgramList(sendMessage, telegramUserId, language);
         }
 
         sendMessage.setText(response.toString());
@@ -121,37 +128,38 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public String getCommandDescription() {
-        return "Show current or saved programs";
+        return BotText.commandDescription(COMMAND, null);
     }
 
-    private SendMessage buildSavedProgramList(SendMessage sendMessage, Long telegramUserId) {
+    private SendMessage buildSavedProgramList(SendMessage sendMessage, Long telegramUserId, com.example.fitnessbot.model.UserLanguage language) {
         List<Program> programs = programService.getProgramsForUser(telegramUserId);
         if (programs.isEmpty()) {
-            sendMessage.setText("You don't have any saved programs yet.\n\nUse /create_program <name> to create your first one.");
+            sendMessage.setText(BotText.noSavedPrograms(language));
             return sendMessage;
         }
 
-        StringBuilder response = new StringBuilder("<b>Your Saved Programs</b>\n\n");
-        List<String> programLabels = buildProgramLabels(programs);
+        StringBuilder response = new StringBuilder(BotText.savedProgramsHeader(language));
+        List<String> programLabels = buildProgramLabels(programs, language);
         for (String programLabel : programLabels) {
             response.append("• ")
                     .append(TrainingDayMessageFormatter.escapeHtml(programLabel))
                     .append("\n");
         }
-        response.append("\nOpen one with the buttons below or send <code>/show_program ")
-                .append(TrainingDayMessageFormatter.escapeHtml(getProgramDisplayName(programs.getFirst())))
-                .append("</code>.");
+        response.append(BotText.openProgramHint(getProgramDisplayName(programs.getFirst(), language), language));
 
         sendMessage.setText(response.toString());
         sendMessage.setParseMode("HTML");
-        sendMessage.setReplyMarkup(createProgramButtons(programs));
+        sendMessage.setReplyMarkup(createProgramButtons(programs, language));
         return sendMessage;
     }
 
-    private SendMessage buildSavedProgramDetails(SendMessage sendMessage, Long telegramUserId, Long programId) {
+    private SendMessage buildSavedProgramDetails(SendMessage sendMessage,
+                                                 Long telegramUserId,
+                                                 Long programId,
+                                                 com.example.fitnessbot.model.UserLanguage language) {
         Optional<Program> program = programService.getProgramForUser(programId, telegramUserId);
         if (program.isEmpty()) {
-            sendMessage.setText("I couldn't find that program.");
+            sendMessage.setText(BotText.programNotFound(language));
             return sendMessage;
         }
 
@@ -159,14 +167,12 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
                 programService.getProgramTrainingDaysForUser(programId, telegramUserId);
 
         StringBuilder response = new StringBuilder();
-        response.append("<b>Program</b>\n")
-                .append(TrainingDayMessageFormatter.escapeHtml(program.get().getName()))
-                .append("\n\n");
+        response.append(BotText.programDetailsHeader(program.get().getName(), language));
 
         if (trainingDays.isEmpty()) {
-            response.append("No training days are linked to this program yet.");
+            response.append(BotText.noLinkedTrainingDays(language));
         } else {
-            response.append("<b>Training days</b>\n");
+            response.append(BotText.trainingDaysHeader(language));
             for (com.example.fitnessbot.model.ProgramTrainingDay programTrainingDay : trainingDays) {
                 TrainingDay trainingDay = programTrainingDay.getTrainingDay();
                 response.append(programTrainingDay.getPosition())
@@ -175,41 +181,41 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
                         .append("\n");
             }
             response.append("\n")
-                    .append(trainingDays.size())
-                    .append(" training ")
-                    .append(trainingDays.size() == 1 ? "day" : "days")
-                    .append(" total.\n");
-            response.append("Tap Start Program when you're ready.");
+                    .append(BotText.trainingDaysTotal(trainingDays.size(), language));
+            response.append(BotText.tapStartProgram(language));
         }
 
         sendMessage.setText(response.toString());
         sendMessage.setParseMode("HTML");
-        sendMessage.setReplyMarkup(createProgramDetailsButtons(programId, trainingDays));
+        sendMessage.setReplyMarkup(createProgramDetailsButtons(programId, trainingDays, language));
         return sendMessage;
     }
 
-    private SendMessage buildSavedProgramDetailsByName(SendMessage sendMessage, Long telegramUserId, String programName) {
+    private SendMessage buildSavedProgramDetailsByName(SendMessage sendMessage,
+                                                       Long telegramUserId,
+                                                       String programName,
+                                                       com.example.fitnessbot.model.UserLanguage language) {
         List<Program> matches = programService.getProgramsForUser(telegramUserId).stream()
                 .filter(program -> program.getName() != null && program.getName().equalsIgnoreCase(programName.trim()))
                 .toList();
 
         if (matches.isEmpty()) {
-            sendMessage.setText("I couldn't find that program.\n\nSend /show_program to see your saved programs.");
+            sendMessage.setText(BotText.programNotFoundShowList(language));
             return sendMessage;
         }
         if (matches.size() > 1) {
-            sendMessage.setText("I found multiple programs named \"" + programName + "\".\n\nChoose the one you want to open:");
-            sendMessage.setReplyMarkup(createProgramButtons(matches));
+            sendMessage.setText(BotText.multipleProgramsFound(programName, language));
+            sendMessage.setReplyMarkup(createProgramButtons(matches, language));
             return sendMessage;
         }
 
-        return buildSavedProgramDetails(sendMessage, telegramUserId, matches.getFirst().getId());
+        return buildSavedProgramDetails(sendMessage, telegramUserId, matches.getFirst().getId(), language);
     }
 
-    private InlineKeyboardMarkup createProgramButtons(List<Program> programs) {
+    private InlineKeyboardMarkup createProgramButtons(List<Program> programs, com.example.fitnessbot.model.UserLanguage language) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        List<String> programLabels = buildProgramLabels(programs);
+        List<String> programLabels = buildProgramLabels(programs, language);
 
         for (int i = 0; i < programs.size(); i++) {
             Program program = programs.get(i);
@@ -223,7 +229,7 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         return markup;
     }
 
-    private List<String> buildProgramLabels(List<Program> programs) {
+    private List<String> buildProgramLabels(List<Program> programs, com.example.fitnessbot.model.UserLanguage language) {
         Map<String, Integer> nameCounts = new HashMap<>();
         for (Program program : programs) {
             nameCounts.merge(normalizeProgramName(program.getName()), 1, Integer::sum);
@@ -234,30 +240,32 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
         for (Program program : programs) {
             String normalizedName = normalizeProgramName(program.getName());
-            String displayName = getProgramDisplayName(program);
+            String displayName = getProgramDisplayName(program, language);
             if (nameCounts.getOrDefault(normalizedName, 0) == 1) {
                 labels.add(displayName);
                 continue;
             }
 
             int occurrence = seenCounts.merge(normalizedName, 1, Integer::sum);
-            labels.add(displayName + " (" + buildProgramDisambiguator(program, occurrence) + ")");
+            labels.add(displayName + " (" + buildProgramDisambiguator(program, occurrence, language) + ")");
         }
 
         return labels;
     }
 
-    private String buildProgramDisambiguator(Program program, int occurrence) {
+    private String buildProgramDisambiguator(Program program,
+                                             int occurrence,
+                                             com.example.fitnessbot.model.UserLanguage language) {
         if (program.getCreatedAt() != null) {
-            return "created " + program.getCreatedAt().format(PROGRAM_CREATED_AT_FORMATTER);
+            return BotText.createdDisambiguator(program.getCreatedAt().format(PROGRAM_CREATED_AT_FORMATTER), language);
         }
-        return "option " + occurrence;
+        return BotText.optionDisambiguator(occurrence, language);
     }
 
-    private String getProgramDisplayName(Program program) {
+    private String getProgramDisplayName(Program program, com.example.fitnessbot.model.UserLanguage language) {
         String name = program.getName();
         if (name == null || name.trim().isEmpty()) {
-            return "Untitled Program";
+            return BotText.untitledProgram(language);
         }
         return name.trim();
     }
@@ -271,20 +279,21 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
 
     private InlineKeyboardMarkup createProgramDetailsButtons(
             Long programId,
-            List<com.example.fitnessbot.model.ProgramTrainingDay> trainingDays) {
+            List<com.example.fitnessbot.model.ProgramTrainingDay> trainingDays,
+            com.example.fitnessbot.model.UserLanguage language) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         InlineKeyboardButton startButton = new InlineKeyboardButton();
-        startButton.setText("Start Program");
+        startButton.setText(BotText.startProgramButton(language));
         startButton.setCallbackData("start_program:" + programId);
 
         InlineKeyboardButton renameButton = new InlineKeyboardButton();
-        renameButton.setText("Rename");
+        renameButton.setText(BotText.renameButton(language));
         renameButton.setCallbackData("rename_program:" + programId);
 
         InlineKeyboardButton deleteButton = new InlineKeyboardButton();
-        deleteButton.setText("Delete Program");
+        deleteButton.setText(BotText.deleteProgramButton(language));
         deleteButton.setCallbackData("delete_program:" + programId);
         rows.add(List.of(startButton, renameButton));
         rows.add(List.of(deleteButton));
@@ -292,7 +301,7 @@ public class ShowProgramCommandHandler implements ContextAwareCommandHandler {
         for (com.example.fitnessbot.model.ProgramTrainingDay programTrainingDay : trainingDays) {
             TrainingDay trainingDay = programTrainingDay.getTrainingDay();
             InlineKeyboardButton dayButton = new InlineKeyboardButton();
-            dayButton.setText("Day " + programTrainingDay.getPosition() + ": " + trainingDay.getTitle());
+            dayButton.setText(BotText.dayButtonPrefix(language) + programTrainingDay.getPosition() + ": " + trainingDay.getTitle());
             dayButton.setCallbackData("show_day_" + trainingDay.getId());
             rows.add(List.of(dayButton));
         }

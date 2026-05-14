@@ -104,9 +104,9 @@ class TelegramUiInteractionTest {
         List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
 
         // Verify main menu structure
-        assertEquals(2, keyboard.size()); // Create/View row + Help row
+        assertEquals(2, keyboard.size()); // Create/View row + Language/Help row
         assertEquals(2, keyboard.get(0).size()); // Create Program + View Programs
-        assertEquals(1, keyboard.get(1).size()); // Help button
+        assertEquals(2, keyboard.get(1).size()); // Language + Help buttons
 
         // Verify button labels and callback data
         InlineKeyboardButton createBtn = keyboard.get(0).get(0);
@@ -117,7 +117,11 @@ class TelegramUiInteractionTest {
         assertEquals("View Programs", viewBtn.getText());
         assertEquals("view_programs", viewBtn.getCallbackData());
 
-        InlineKeyboardButton helpBtn = keyboard.get(1).get(0);
+        InlineKeyboardButton languageBtn = keyboard.get(1).get(0);
+        assertEquals("Language", languageBtn.getText());
+        assertEquals("language", languageBtn.getCallbackData());
+
+        InlineKeyboardButton helpBtn = keyboard.get(1).get(1);
         assertEquals("Help", helpBtn.getText());
         assertEquals("help", helpBtn.getCallbackData());
     }
@@ -141,7 +145,7 @@ class TelegramUiInteractionTest {
         // With active session, should show Finish/Cancel buttons instead of Create/View
         assertEquals(2, keyboard.size());
         assertEquals(2, keyboard.get(0).size()); // Finish + Cancel buttons
-        assertEquals(1, keyboard.get(1).size()); // Help button
+        assertEquals(2, keyboard.get(1).size()); // Language + Help buttons
 
         InlineKeyboardButton finishBtn = keyboard.get(0).get(0);
         assertEquals("Finish Program", finishBtn.getText());
