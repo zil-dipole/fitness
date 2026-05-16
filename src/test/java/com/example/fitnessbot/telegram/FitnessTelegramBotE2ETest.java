@@ -82,6 +82,7 @@ class FitnessTelegramBotE2ETest extends AbstractWithDbTest {
         assertThat(sessionManager.hasActiveSession(TELEGRAM_USER_ID)).isTrue();
 
         User persistedUser = userRepository.findByTelegramId(TELEGRAM_USER_ID).orElseThrow();
+        assertThat(persistedUser.getTelegramUsername()).isEqualTo("e2e_user");
         List<Program> persistedPrograms = programRepository.findByUserId(persistedUser.getId());
         assertThat(persistedPrograms).hasSize(1);
         Program createdProgram = persistedPrograms.getFirst();
@@ -156,6 +157,7 @@ class FitnessTelegramBotE2ETest extends AbstractWithDbTest {
         org.telegram.telegrambots.meta.api.objects.User user = new org.telegram.telegrambots.meta.api.objects.User();
         user.setId(TELEGRAM_USER_ID);
         user.setFirstName("E2E");
+        user.setUserName("E2E_User");
         user.setIsBot(false);
         return user;
     }

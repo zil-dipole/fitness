@@ -8,6 +8,7 @@ import com.example.fitnessbot.exception.WorkoutException;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramRenameSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.TelegramUserProfileService;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.UserLanguageService;
 import com.example.fitnessbot.service.WorkoutService;
@@ -59,6 +60,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private final CommandRegistryService commandRegistryService;
     private final MenuKeyboardFactory menuKeyboardFactory;
     private final UserLanguageService languageService;
+    private final TelegramUserProfileService userProfileService;
 
     private final String botUsername;
 
@@ -73,6 +75,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                               CommandRegistryService commandRegistryService,
                               MenuKeyboardFactory menuKeyboardFactory,
                               UserLanguageService languageService,
+                              TelegramUserProfileService userProfileService,
                               @Value("${telegram.bot.token:}") String botToken,
                               @Value("${telegram.bot.username:}") String botUsername) {
         super(botToken);
@@ -86,6 +89,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         this.commandRegistryService = commandRegistryService;
         this.menuKeyboardFactory = menuKeyboardFactory;
         this.languageService = languageService;
+        this.userProfileService = userProfileService;
         this.botUsername = botUsername;
     }
 
@@ -110,6 +114,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 callbackQueryHandlers,
                 commandRegistryService,
                 menuKeyboardFactory,
+                null,
                 null,
                 botToken,
                 botUsername
@@ -144,6 +149,8 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        recordTelegramUser(update);
+
         // Handle forwarded messages
         if (update.hasMessage() && update.getMessage().hasText() &&
                 (update.getMessage().getForwardFrom() != null || update.getMessage().getForwardFromChat() != null)) {
@@ -160,6 +167,29 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         // Handle plain workout input, such as weight entries for the current set
         else if (update.hasMessage() && update.getMessage().hasText()) {
             handlePlainTextMessage(update);
+        }
+    }
+
+    private void recordTelegramUser(Update update) {
+        if (userProfileService == null || update == null) {
+            return;
+        }
+
+        org.telegram.telegrambots.meta.api.objects.User telegramUser = null;
+        if (update.hasMessage() && update.getMessage() != null) {
+            telegramUser = update.getMessage().getFrom();
+        } else if (update.hasCallbackQuery() && update.getCallbackQuery() != null) {
+            telegramUser = update.getCallbackQuery().getFrom();
+        }
+
+        if (telegramUser == null) {
+            return;
+        }
+
+        try {
+            userProfileService.recordTelegramUser(telegramUser);
+        } catch (Exception e) {
+            log.warn("Failed to record Telegram profile for user {}", telegramUser.getId(), e);
         }
     }
 

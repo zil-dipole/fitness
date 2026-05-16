@@ -3,6 +3,7 @@ package com.example.fitnessbot.model;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 /**
  * Represents a user of the fitness bot.
@@ -17,6 +18,9 @@ public class User {
 
     @Column(name = "telegram_id", nullable = false, unique = true)
     private Long telegramId;
+
+    @Column(name = "telegram_username", length = 32)
+    private String telegramUsername;
 
     private String name;
 
@@ -66,6 +70,23 @@ public class User {
      */
     public void setTelegramId(Long telegramId) {
         this.telegramId = telegramId;
+    }
+
+    public String getTelegramUsername() {
+        return telegramUsername;
+    }
+
+    public void setTelegramUsername(String telegramUsername) {
+        if (telegramUsername == null || telegramUsername.isBlank()) {
+            this.telegramUsername = null;
+            return;
+        }
+
+        String normalized = telegramUsername.trim();
+        if (normalized.startsWith("@")) {
+            normalized = normalized.substring(1);
+        }
+        this.telegramUsername = normalized.toLowerCase(Locale.ROOT);
     }
 
     public String getName() {

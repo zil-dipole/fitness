@@ -7,8 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.test.context.TestPropertySource;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +62,20 @@ class UserRepositoryTest extends AbstractWithDbTest {
         assertThat(foundUser).isPresent();
         assertThat(foundUser.get().getName()).isEqualTo("Jane Smith");
         assertThat(foundUser.get().getWeightKg()).isEqualTo(65.0);
+    }
+
+    @Test
+    void testFindByTelegramUsernameIgnoreCase() {
+        User user = new User();
+        user.setTelegramId(222333444L);
+        user.setTelegramUsername("MGhostL");
+
+        entityManager.persistAndFlush(user);
+
+        List<User> foundUsers = userRepository.findByTelegramUsernameIgnoreCase("mghostl");
+        assertThat(foundUsers).hasSize(1);
+        assertThat(foundUsers.getFirst().getTelegramId()).isEqualTo(222333444L);
+        assertThat(foundUsers.getFirst().getTelegramUsername()).isEqualTo("mghostl");
     }
 
     @Test

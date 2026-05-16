@@ -136,7 +136,21 @@ sudo systemctl reload fitness-bot
 
 Liquibase migrations run automatically when the app starts.
 
-## 8. Backup Database
+## 8. Enable AI Parser For A User
+
+From this repository, target the Raspberry Pi deployment and enable AI parsing for the default Telegram username `@mghostl`. The script calls the admin HTTP API with `curl`:
+
+```bash
+deploy/set-ai-parser-user.sh
+```
+
+If the deployed app has not captured the Telegram username yet, pass the numeric Telegram ID explicitly:
+
+```bash
+deploy/set-ai-parser-user.sh --telegram-id 123456789
+```
+
+## 9. Backup Database
 
 ```bash
 cd /opt/fitness-bot/deploy

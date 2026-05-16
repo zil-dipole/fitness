@@ -27,3 +27,5 @@ databaseChangeLog:
       file: db/changelog/014-add-workout-session-skipped-steps.yaml
   - include:
       file: db/changelog/015-add-user-language.yaml
+  - include:
+      file: db/changelog/016-add-user-telegram-username.yaml

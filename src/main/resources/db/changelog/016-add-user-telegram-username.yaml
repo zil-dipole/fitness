@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-add-user-telegram-username
+      author: developer
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: telegram_username
+                  type: varchar(32)
+        - createIndex:
+            tableName: users
+            indexName: idx_users_telegram_username
+            columns:
+              - column:
+                  name: telegram_username

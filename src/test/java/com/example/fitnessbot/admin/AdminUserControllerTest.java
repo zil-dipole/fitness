@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -64,6 +65,47 @@ class AdminUserControllerTest {
                 .andExpect(jsonPath("$.useAiParser").value(true));
 
         verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void updateParserFlagByTelegramLoginUpdatesExistingUser() throws Exception {
+        User user = new User();
+        user.setTelegramId(123L);
+        user.setTelegramUsername("mghostl");
+        user.setUseAiParser(false);
+
+        when(userRepository.findByTelegramUsernameIgnoreCase("mghostl")).thenReturn(List.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(put("/admin/users/by-login/{telegramLogin}/parser", "@MGhostL")
+                        .with(httpBasic("admin", "test-password"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "useAiParser": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telegramUserId").value(123))
+                .andExpect(jsonPath("$.useAiParser").value(true));
+
+        verify(userRepository).findByTelegramUsernameIgnoreCase("mghostl");
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void updateParserFlagByTelegramLoginReturnsNotFoundWhenUserDoesNotExist() throws Exception {
+        when(userRepository.findByTelegramUsernameIgnoreCase("unknown_user")).thenReturn(List.of());
+
+        mockMvc.perform(put("/admin/users/by-login/{telegramLogin}/parser", "unknown_user")
+                        .with(httpBasic("admin", "test-password"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "useAiParser": true
+                                }
+                                """))
+                .andExpect(status().isNotFound());
     }
 
     @Test

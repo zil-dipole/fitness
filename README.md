@@ -60,6 +60,15 @@ curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" \
   -d '{"useAiParser":true}'
 ```
 
+You can also target a stored Telegram login:
+
+```bash
+curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" \
+  -X PUT http://localhost:8080/admin/users/by-login/mghostl/parser \
+  -H "Content-Type: application/json" \
+  -d '{"useAiParser":true}'
+```
+
 ### Run Tests
 
 To run tests:
