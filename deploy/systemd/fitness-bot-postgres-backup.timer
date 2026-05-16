@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Fitness Bot PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=fitness-bot-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

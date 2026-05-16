@@ -150,21 +150,64 @@ If the deployed app has not captured the Telegram username yet, pass the numeric
 deploy/set-ai-parser-user.sh --telegram-id 123456789
 ```
 
-## 9. Backup Database
+## 9. Scheduled PostgreSQL Backups
+
+The deployment includes a host-side backup script and systemd timer:
+
+- `deploy/backup-postgres.sh` creates a compressed custom-format `pg_dump`.
+- `deploy/systemd/fitness-bot-postgres-backup.timer` runs it daily at `03:15` with a small randomized delay.
+- Backups are stored locally under `/opt/fitness-bot/backups/postgres` by default.
+
+Install the timer on the Raspberry Pi after deployment:
+
+```bash
+ssh lev@raspberrypi.local
+cd /opt/fitness-bot/deploy
+sudo ./install-postgres-backup.sh
+```
+
+To change the local backup directory or retention, configure it on the Pi:
+
+```bash
+cd /opt/fitness-bot/deploy
+sudo cp -n backup.env.example backup.env
+sudo nano backup.env
+sudo systemctl restart fitness-bot-postgres-backup.timer
+```
+
+Example:
+
+```bash
+BACKUP_DIR=/opt/fitness-bot/backups/postgres
+BACKUP_RETENTION_DAYS=14
+```
+
+Run a backup immediately and inspect timer status:
+
+```bash
+sudo systemctl start fitness-bot-postgres-backup.service
+systemctl list-timers fitness-bot-postgres-backup.timer
+journalctl -u fitness-bot-postgres-backup.service -n 100 --no-pager
+```
+
+Manual backup without systemd:
+
+```bash
+cd /opt/fitness-bot/deploy
+./backup-postgres.sh
+```
+
+Restore example:
 
 ```bash
 cd /opt/fitness-bot/deploy
 set -a
 . ./.env
 set +a
-docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > fitness_bot_$(date +%F).sql
-```
-
-Restore example:
-
-```bash
-set -a
-. ./.env
-set +a
-cat fitness_bot_YYYY-MM-DD.sql | docker compose exec -T postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
+cat /opt/fitness-bot/backups/postgres/fitness_bot_postgres_YYYYMMDDTHHMMSSZ.dump \
+  | docker compose exec -T postgres pg_restore \
+      -U "$POSTGRES_USER" \
+      -d "$POSTGRES_DB" \
+      --clean \
+      --if-exists
 ```

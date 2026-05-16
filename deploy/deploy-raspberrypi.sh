@@ -264,6 +264,7 @@ echo "Syncing deployment files to ${REMOTE}:${REMOTE_DIR}/deploy..."
 rsync -az --delete \
   -e "ssh -o ConnectTimeout=${SSH_CONNECT_TIMEOUT} -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=2" \
   --exclude '.env' \
+  --exclude 'backup.env' \
   "$repo_root/deploy"/ "$REMOTE":"$REMOTE_DIR/deploy"/
 
 rsync -az \

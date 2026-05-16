@@ -1,0 +1,14 @@
+[Unit]
+Description=Back up Fitness Bot PostgreSQL database
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/fitness-bot/deploy/compose.yml
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/fitness-bot/deploy
+ExecStart=/opt/fitness-bot/deploy/backup-postgres.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

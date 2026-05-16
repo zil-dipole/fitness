@@ -3,3 +3,4 @@ target
 target/
 /src/main/resources/application-with-creds.yml
 deploy/.env
+deploy/backup.env
