@@ -39,6 +39,33 @@ delete_old_backups() {
     -mtime "+${retention_days}" -delete
 }
 
+sync_backup_with_rsync() {
+  local target="$1"
+  local options="$2"
+  local -a rsync_options
+
+  [[ -n "$target" ]] || return 0
+  require_command rsync
+
+  read -r -a rsync_options <<< "$options"
+  if [[ ${#rsync_options[@]} -eq 0 ]]; then
+    rsync_options=(-az --mkpath)
+  fi
+
+  if [[ "$target" != */ ]]; then
+    target="${target}/"
+  fi
+
+  rsync "${rsync_options[@]}" \
+    "$backup_file" \
+    "$checksum_file" \
+    "$BACKUP_DIR/latest.dump" \
+    "$BACKUP_DIR/latest.dump.sha256" \
+    "$target"
+
+  echo "Synced PostgreSQL backup with rsync: $target"
+}
+
 load_env_file "$ENV_FILE"
 load_env_file "$BACKUP_ENV_FILE"
 
@@ -46,6 +73,8 @@ POSTGRES_DB="${POSTGRES_DB:-fitness_bot}"
 POSTGRES_USER="${POSTGRES_USER:-fitness_bot}"
 BACKUP_DIR="${BACKUP_DIR:-$app_dir/backups/postgres}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
+BACKUP_RSYNC_TARGET="${BACKUP_RSYNC_TARGET:-}"
+BACKUP_RSYNC_OPTIONS="${BACKUP_RSYNC_OPTIONS:--az --mkpath}"
 
 require_command docker
 require_command sha256sum
@@ -84,5 +113,6 @@ mv "$tmp_file" "$backup_file"
 cp "$backup_file" "$BACKUP_DIR/latest.dump"
 (cd "$BACKUP_DIR" && sha256sum latest.dump > latest.dump.sha256)
 delete_old_backups "$BACKUP_DIR" "$BACKUP_RETENTION_DAYS"
+sync_backup_with_rsync "$BACKUP_RSYNC_TARGET" "$BACKUP_RSYNC_OPTIONS"
 
 echo "Backup complete: $backup_file"

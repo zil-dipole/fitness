@@ -182,6 +182,19 @@ BACKUP_DIR=/opt/fitness-bot/backups/postgres
 BACKUP_RETENTION_DAYS=14
 ```
 
+To enable rsync copy to Google Drive, run the helper on the Pi with the existing rsync root target. It creates and uses `FitnessBot/backup/db` under that root:
+
+```bash
+cd /opt/fitness-bot/deploy
+sudo ./enable-google-drive-postgres-rsync.sh --rsync-root user@example.com:/GoogleDrive --run-now
+```
+
+For a local Google Drive path mounted on the Pi:
+
+```bash
+sudo ./enable-google-drive-postgres-rsync.sh --rsync-root /mnt/google-drive --run-now
+```
+
 Run a backup immediately and inspect timer status:
 
 ```bash
