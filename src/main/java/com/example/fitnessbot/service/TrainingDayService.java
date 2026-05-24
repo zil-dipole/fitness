@@ -51,6 +51,25 @@ public class TrainingDayService {
      */
     @Transactional
     public TrainingDay processForwardedMessage(Long telegramUserId, String rawText) {
+        return processForwardedMessage(telegramUserId, rawText, rawText);
+    }
+
+    /**
+     * Process workout text while allowing a parser-specific representation.
+     *
+     * <p>The original raw text is kept on the saved entity. If the user has
+     * AI parsing enabled, {@code aiParserRawText} is sent to the OpenAI parser.
+     * This lets Excel uploads preserve spreadsheet rows for the AI parser while
+     * keeping a deterministic parser-friendly text body as the stored source.</p>
+     *
+     * @param telegramUserId Telegram chat identifier
+     * @param rawText text to save as the training-day source
+     * @param aiParserRawText optional text to send to the OpenAI parser
+     * @return the persisted TrainingDay entity
+     * @throws IllegalArgumentException if the input is invalid
+     */
+    @Transactional
+    public TrainingDay processForwardedMessage(Long telegramUserId, String rawText, String aiParserRawText) {
         // Validate input
         if (telegramUserId == null) {
             throw new IllegalArgumentException("Telegram user ID cannot be null");
@@ -72,8 +91,16 @@ public class TrainingDayService {
                 });
 
         // 2. Parse the raw text into a structured model
+        String parserInput = rawText;
+        if (user.isUseAiParser() && StringUtils.hasText(aiParserRawText)) {
+            if (aiParserRawText.length() > 10000) {
+                throw new IllegalArgumentException("OpenAI parser text is too large (max 10KB allowed)");
+            }
+            parserInput = aiParserRawText;
+        }
+
         TrainingDay parsedTrainingDay = user.isUseAiParser()
-                ? openAiTrainingDayParser.parse(rawText)
+                ? openAiTrainingDayParser.parse(parserInput)
                 : parser.parse(rawText);
 
         // 3. Set the user and raw text

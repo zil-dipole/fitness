@@ -1,6 +1,5 @@
 package com.example.fitnessbot.telegram;
 
-import com.example.fitnessbot.model.Exercise;
 import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.User;
@@ -9,8 +8,10 @@ import com.example.fitnessbot.service.ProgramRenameSessionManager;
 import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.WorkoutService;
-import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import com.example.fitnessbot.telegram.commands.*;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,11 +20,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.ArgumentCaptor;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.Document;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -463,6 +467,45 @@ class TelegramUiInteractionTest {
     }
 
     @Test
+    void testProgramCreationAcceptsExcelWorkbookUpload() throws Exception {
+        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
+        program.setId(1L);
+        program.setName("Excel Program");
+        sessionManager.startSession(USER_ID, program);
+
+        byte[] workbookBytes = createWorkbookBytes();
+        doReturn(new ByteArrayInputStream(workbookBytes))
+                .when(fitnessTelegramBot)
+                .downloadTelegramDocument(any(Document.class));
+        when(trainingDayService.processForwardedMessage(eq(USER_ID), anyString(), anyString()))
+                .thenReturn(trainingDay(1L), trainingDay(2L));
+
+        fitnessTelegramBot.onUpdateReceived(createMockExcelDocumentUpdate("program.xlsx", workbookBytes.length));
+
+        ArgumentCaptor<String> rawTextCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> aiRawTextCaptor = ArgumentCaptor.forClass(String.class);
+        verify(trainingDayService, times(2))
+                .processForwardedMessage(eq(USER_ID), rawTextCaptor.capture(), aiRawTextCaptor.capture());
+        assertEquals(2, sessionManager.getSession(USER_ID).getTrainingDaysCount());
+        assertTrue(rawTextCaptor.getAllValues().get(0).contains("Upper Body:"));
+        assertTrue(rawTextCaptor.getAllValues().get(0).contains("- Bench press 3 x 8"));
+        assertTrue(rawTextCaptor.getAllValues().get(1).contains("Lower Body:"));
+        assertTrue(rawTextCaptor.getAllValues().get(1).contains("- Squat 4 x 5"));
+        assertTrue(aiRawTextCaptor.getAllValues().get(0).contains("Sheet: Upper Body"));
+        assertTrue(aiRawTextCaptor.getAllValues().get(0).contains("Exercise | Sets | Reps"));
+        assertTrue(aiRawTextCaptor.getAllValues().get(0).contains("Bench press | 3 | 8"));
+        assertTrue(aiRawTextCaptor.getAllValues().get(1).contains("Sheet: Lower Body"));
+        assertTrue(aiRawTextCaptor.getAllValues().get(1).contains("Squat | 4 | 5"));
+
+        ArgumentCaptor<SendMessage> messageCaptor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(fitnessTelegramBot).sendTelegramMessage(messageCaptor.capture());
+        SendMessage response = messageCaptor.getValue();
+        assertTrue(response.getText().contains("Imported 2 training days from \"program.xlsx\""));
+        assertTrue(response.getText().contains("Excel Program"));
+        assertTrue(response.getReplyMarkup() instanceof InlineKeyboardMarkup);
+    }
+
+    @Test
     void testShowDayCallbackQueryWithNoTrainingDays() throws Exception {
         Update update = createMockUpdateWithCallbackQuery("show_day_1");
         fitnessTelegramBot.onUpdateReceived(update);
@@ -526,6 +569,50 @@ class TelegramUiInteractionTest {
         lenient().when(user.getId()).thenReturn(USER_ID);
 
         return update;
+    }
+
+    private Update createMockExcelDocumentUpdate(String fileName, long fileSize) {
+        Update update = mock(Update.class);
+        Message message = mock(Message.class);
+        Document document = mock(Document.class);
+        org.telegram.telegrambots.meta.api.objects.User user = mock(org.telegram.telegrambots.meta.api.objects.User.class);
+
+        lenient().when(update.hasMessage()).thenReturn(true);
+        lenient().when(update.getMessage()).thenReturn(message);
+        lenient().when(message.hasDocument()).thenReturn(true);
+        lenient().when(message.getDocument()).thenReturn(document);
+        lenient().when(message.getChatId()).thenReturn(CHAT_ID);
+        lenient().when(message.getFrom()).thenReturn(user);
+        lenient().when(document.getFileId()).thenReturn("telegram-file-id");
+        lenient().when(document.getFileName()).thenReturn(fileName);
+        lenient().when(document.getMimeType()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        lenient().when(document.getFileSize()).thenReturn(fileSize);
+        lenient().when(user.getId()).thenReturn(USER_ID);
+
+        return update;
+    }
+
+    private byte[] createWorkbookBytes() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet upper = workbook.createSheet("Upper Body");
+            upper.createRow(0).createCell(0).setCellValue("Exercise");
+            upper.getRow(0).createCell(1).setCellValue("Sets");
+            upper.getRow(0).createCell(2).setCellValue("Reps");
+            Row bench = upper.createRow(1);
+            bench.createCell(0).setCellValue("Bench press");
+            bench.createCell(1).setCellValue(3);
+            bench.createCell(2).setCellValue(8);
+
+            Sheet lower = workbook.createSheet("Lower Body");
+            Row squat = lower.createRow(0);
+            squat.createCell(0).setCellValue("Squat");
+            squat.createCell(1).setCellValue(4);
+            squat.createCell(2).setCellValue(5);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        }
     }
 
     private TrainingDay trainingDay(Long id) {

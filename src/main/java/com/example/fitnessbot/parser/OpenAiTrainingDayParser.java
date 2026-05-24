@@ -67,8 +67,10 @@ public class OpenAiTrainingDayParser {
             17. If something is ambiguous, prefer a conservative parse: keep uncertain text in `notes`, and use null instead of guessing numeric fields.
             18. Numbered list items like `1.` or `2)` can be exercises and should be parsed just like bullet items.
             19. If a section/header indicates rounds or circuits, such as `3 rounds`, `3 circles`, or `3 круга`, keep that section and also carry the round-by-round instruction into each exercise's `notes` when useful.
-            20. Do not invent exercises or fields.
-            21. Return valid JSON only.
+            20. Input may come from an Excel sheet. In that case, lines may describe spreadsheet rows with cells separated by ` | `. Use header cells such as Exercise, Sets, Reps, Duration, Notes, Video, Section, or their Russian equivalents to map row values.
+            21. For spreadsheet rows, each visible sheet is one training day. Use the sheet name as title when no better title is present.
+            22. Do not invent exercises or fields.
+            23. Return valid JSON only.
             """;
 
     private static final String TRAINING_DAY_SCHEMA = """

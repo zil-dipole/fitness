@@ -389,6 +389,43 @@ class TrainingDayServiceTest {
     }
 
     @Test
+    void testProcessForwardedMessageUsesOpenAiSpecificInputForFlaggedUser() {
+        String rawText = "Upper Body:\n- Bench press 3 x 8";
+        String aiRawText = """
+                Sheet: Upper Body
+                Spreadsheet rows; cells are separated by " | ":
+                Exercise | Sets | Reps
+                Bench press | 3 | 8
+                """;
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(true);
+
+        TrainingDay parsedTrainingDay = new TrainingDay();
+        parsedTrainingDay.setTitle("Upper Body");
+        Exercise exercise = new Exercise();
+        exercise.setPosition(0);
+        exercise.setSection("General");
+        exercise.setName("Bench press");
+        exercise.setSets(3);
+        exercise.setRepsOrDuration("8");
+        parsedTrainingDay.setExercises(List.of(exercise));
+
+        when(userRepository.findByTelegramId(TEST_TELEGRAM_ID)).thenReturn(Optional.of(user));
+        when(openAiTrainingDayParser.parse(aiRawText)).thenReturn(parsedTrainingDay);
+        when(trainingDayRepository.save(any(TrainingDay.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TrainingDay result = trainingDayService.processForwardedMessage(TEST_TELEGRAM_ID, rawText, aiRawText);
+
+        assertThat(result.getRawText()).isEqualTo(rawText);
+        assertThat(result.getTitle()).isEqualTo("Upper Body");
+        verify(openAiTrainingDayParser).parse(aiRawText);
+        verifyNoInteractions(parser);
+    }
+
+    @Test
     void testProcessForwardedMessageNormalizesMistypedRussianTitle() {
         String rawText = "Nhtyz 2:\n\nРазминка:\n- Бег 5 мин\n";
 

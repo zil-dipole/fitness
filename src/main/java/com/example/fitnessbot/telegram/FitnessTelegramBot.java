@@ -5,6 +5,7 @@ import com.example.fitnessbot.exception.ProgramException;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.UserLanguage;
 import com.example.fitnessbot.exception.WorkoutException;
+import com.example.fitnessbot.parser.TrainingDayWorkbookParser;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramRenameSessionManager;
 import com.example.fitnessbot.service.ProgramService;
@@ -28,18 +29,22 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.Document;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeAllPrivateChats;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Locale;
 
 @Component
 @ConditionalOnProperty(name = "telegram.bot.token")
@@ -49,8 +54,10 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     // Number of commands to display per row in the command keyboard
     private static final int COMMANDS_PER_ROW = 2;
+    private static final long MAX_EXCEL_DOCUMENT_SIZE_BYTES = 5L * 1024L * 1024L;
 
     private final TrainingDayService trainingDayService;
+    private final TrainingDayWorkbookParser workbookParser;
     private final WorkoutService workoutService;
     private final ProgramService programService;
     private final ProgramCreationSessionManager sessionManager;
@@ -66,6 +73,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     public FitnessTelegramBot(TrainingDayService trainingDayService,
+                              TrainingDayWorkbookParser workbookParser,
                               WorkoutService workoutService,
                               ProgramService programService,
                               ProgramCreationSessionManager sessionManager,
@@ -80,6 +88,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                               @Value("${telegram.bot.username:}") String botUsername) {
         super(botToken);
         this.trainingDayService = trainingDayService;
+        this.workbookParser = workbookParser;
         this.workoutService = workoutService;
         this.programService = programService;
         this.sessionManager = sessionManager;
@@ -106,6 +115,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                               @Value("${telegram.bot.username:}") String botUsername) {
         this(
                 trainingDayService,
+                new TrainingDayWorkbookParser(),
                 workoutService,
                 programService,
                 sessionManager,
@@ -163,6 +173,10 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         // Handle callback queries (button presses)
         else if (update.hasCallbackQuery()) {
             handleCallbackQuery(update.getCallbackQuery());
+        }
+        // Handle uploaded files
+        else if (update.hasMessage() && update.getMessage().hasDocument()) {
+            handleDocumentMessage(update);
         }
         // Handle plain workout input, such as weight entries for the current set
         else if (update.hasMessage() && update.getMessage().hasText()) {
@@ -470,6 +484,109 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 log.error("Failed to send error message to user", telegramApiException);
             }
         }
+    }
+
+    private void handleDocumentMessage(Update update) {
+        Long userId = update.getMessage().getFrom().getId();
+        Long chatId = update.getMessage().getChatId();
+        Document document = update.getMessage().getDocument();
+        var language = BotText.language(languageService, userId);
+
+        SendMessage response = new SendMessage();
+        response.setChatId(chatId.toString());
+
+        if (!sessionManager.hasActiveSession(userId)) {
+            response.setText(BotText.excelUploadNeedsDraft(language));
+            sendDocumentResponse(response);
+            return;
+        }
+
+        if (!isExcelDocument(document)) {
+            response.setText(BotText.excelUploadUnsupported(language));
+            sendDocumentResponse(response);
+            return;
+        }
+
+        Long fileSize = document.getFileSize();
+        if (fileSize != null && fileSize > MAX_EXCEL_DOCUMENT_SIZE_BYTES) {
+            response.setText(BotText.excelUploadTooLarge(language));
+            sendDocumentResponse(response);
+            return;
+        }
+
+        try (InputStream inputStream = downloadTelegramDocument(document)) {
+            List<TrainingDayWorkbookParser.WorkbookTrainingDay> workbookTrainingDays = workbookParser.parse(inputStream);
+            var session = sessionManager.getSession(userId);
+
+            int importedCount = 0;
+            for (TrainingDayWorkbookParser.WorkbookTrainingDay workbookTrainingDay : workbookTrainingDays) {
+                TrainingDay trainingDay = trainingDayService.processForwardedMessage(
+                        userId,
+                        workbookTrainingDay.rawText(),
+                        workbookTrainingDay.aiRawText()
+                );
+                session.addTrainingDay(trainingDay);
+                importedCount++;
+            }
+
+            response.setText(BotText.excelUploadImported(
+                    importedCount,
+                    documentFileName(document),
+                    session.getProgram().getName(),
+                    session.getTrainingDaysCount(),
+                    language
+            ));
+            response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
+            sendTelegramMessage(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid Excel training day upload from user {}: {}", userId, e.getMessage());
+            response.setText(BotText.excelUploadParseError(language) + e.getMessage());
+            sendDocumentResponse(response);
+        } catch (TrainingDayException e) {
+            log.warn("Parser error for Excel training day upload from user {}: {}", userId, e.getMessage());
+            response.setText(BotText.parseTrainingDayError(language) + e.getMessage());
+            sendDocumentResponse(response);
+        } catch (Exception e) {
+            log.error("Failed to process Excel training day upload for user " + userId, e);
+            response.setText(BotText.excelUploadGenericError(language));
+            sendDocumentResponse(response);
+        }
+    }
+
+    protected InputStream downloadTelegramDocument(Document document) throws Exception {
+        org.telegram.telegrambots.meta.api.objects.File telegramFile = execute(new GetFile(document.getFileId()));
+        return downloadFileAsStream(telegramFile);
+    }
+
+    private void sendDocumentResponse(SendMessage response) {
+        try {
+            sendTelegramMessage(response);
+        } catch (Exception telegramApiException) {
+            log.error("Failed to send document response message to user", telegramApiException);
+        }
+    }
+
+    private boolean isExcelDocument(Document document) {
+        if (document == null || document.getFileId() == null || document.getFileId().isBlank()) {
+            return false;
+        }
+
+        String fileName = document.getFileName() == null ? "" : document.getFileName().toLowerCase(Locale.ROOT);
+        if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls") || fileName.endsWith(".xlsm")) {
+            return true;
+        }
+
+        String mimeType = document.getMimeType() == null ? "" : document.getMimeType().toLowerCase(Locale.ROOT);
+        return mimeType.equals("application/vnd.ms-excel")
+                || mimeType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                || mimeType.equals("application/vnd.ms-excel.sheet.macroenabled.12");
+    }
+
+    private String documentFileName(Document document) {
+        if (document == null || document.getFileName() == null || document.getFileName().isBlank()) {
+            return "Excel file";
+        }
+        return document.getFileName();
     }
 
     private void handlePlainTextMessage(Update update) {

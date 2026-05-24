@@ -310,6 +310,42 @@ public final class BotText {
         return msg("trainingDay.error.addToDraft", language);
     }
 
+    public static String excelUploadNeedsDraft(UserLanguage language) {
+        return msg("trainingDay.file.needsDraft", language);
+    }
+
+    public static String excelUploadUnsupported(UserLanguage language) {
+        return msg("trainingDay.file.unsupported", language);
+    }
+
+    public static String excelUploadTooLarge(UserLanguage language) {
+        return msg("trainingDay.file.tooLarge", language);
+    }
+
+    public static String excelUploadImported(int importedCount,
+                                             String fileName,
+                                             String programName,
+                                             int trainingDaysCount,
+                                             UserLanguage language) {
+        return msg(
+                "trainingDay.file.imported",
+                language,
+                trainingDaysCount(importedCount, language),
+                fileName,
+                programName,
+                trainingDaysCount(trainingDaysCount, language),
+                finishProgramButton(language)
+        );
+    }
+
+    public static String excelUploadParseError(UserLanguage language) {
+        return msg("trainingDay.file.parseError", language);
+    }
+
+    public static String excelUploadGenericError(UserLanguage language) {
+        return msg("trainingDay.file.genericError", language);
+    }
+
     public static String callbackUnknown(UserLanguage language) {
         return msg("callback.unknown", language);
     }
