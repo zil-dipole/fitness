@@ -491,6 +491,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         Long chatId = update.getMessage().getChatId();
         Document document = update.getMessage().getDocument();
         var language = BotText.language(languageService, userId);
+        String fileName = documentFileName(document);
 
         SendMessage response = new SendMessage();
         response.setChatId(chatId.toString());
@@ -508,6 +509,7 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         }
 
         Long fileSize = document.getFileSize();
+        log.info("Received Excel upload '{}' from user {} ({} bytes)", fileName, userId, fileSize);
         if (fileSize != null && fileSize > MAX_EXCEL_DOCUMENT_SIZE_BYTES) {
             response.setText(BotText.excelUploadTooLarge(language));
             sendDocumentResponse(response);
@@ -515,11 +517,25 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         }
 
         try (InputStream inputStream = downloadTelegramDocument(document)) {
+            log.info("Downloaded Excel upload '{}' for user {}; parsing workbook", fileName, userId);
             List<TrainingDayWorkbookParser.WorkbookTrainingDay> workbookTrainingDays = workbookParser.parse(inputStream);
+            log.info(
+                    "Excel upload '{}' for user {} parsed into {} sheet training day(s)",
+                    fileName,
+                    userId,
+                    workbookTrainingDays.size()
+            );
             var session = sessionManager.getSession(userId);
 
             int importedCount = 0;
             for (TrainingDayWorkbookParser.WorkbookTrainingDay workbookTrainingDay : workbookTrainingDays) {
+                log.info(
+                        "Importing Excel sheet '{}' for user {} (raw text {} chars, OpenAI text {} chars)",
+                        workbookTrainingDay.sheetName(),
+                        userId,
+                        workbookTrainingDay.rawText().length(),
+                        workbookTrainingDay.aiRawText().length()
+                );
                 TrainingDay trainingDay = trainingDayService.processForwardedMessage(
                         userId,
                         workbookTrainingDay.rawText(),
@@ -529,9 +545,16 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 importedCount++;
             }
 
+            log.info(
+                    "Imported {} training day(s) from Excel upload '{}' for user {} into draft program '{}'",
+                    importedCount,
+                    fileName,
+                    userId,
+                    session.getProgram().getName()
+            );
             response.setText(BotText.excelUploadImported(
                     importedCount,
-                    documentFileName(document),
+                    fileName,
                     session.getProgram().getName(),
                     session.getTrainingDaysCount(),
                     language

@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfigurer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -23,6 +25,8 @@ import java.util.Locale;
 
 @Component
 public class OpenAiTrainingDayParser {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenAiTrainingDayParser.class);
 
     static final String PARSING_PROMPT = """
             You are an information extraction engine for a fitness training service.
@@ -171,6 +175,7 @@ public class OpenAiTrainingDayParser {
             throw new TrainingDayException("AI parser is useAiParser for the user, but no API key is configured. Set OPENAI_API_KEY or NEBIUS_API_KEY");
         }
 
+        log.info("Parsing training day with OpenAI-compatible model '{}' ({} chars)", model, rawText.length());
         String jsonPayload = usesChatCompletionsFirst()
                 ? parseWithChatCompletions(rawText)
                 : parseWithResponsesThenFallback(rawText);
@@ -181,7 +186,12 @@ public class OpenAiTrainingDayParser {
 
         try {
             ParsedTrainingDay parsed = objectMapper.readValue(jsonPayload, ParsedTrainingDay.class);
-            return toTrainingDay(parsed);
+            TrainingDay trainingDay = toTrainingDay(parsed);
+            log.info(
+                    "OpenAI-compatible parser completed training day parse ({} exercise(s))",
+                    trainingDay.getExercises() == null ? 0 : trainingDay.getExercises().size()
+            );
+            return trainingDay;
         } catch (Exception e) {
             throw new TrainingDayException("Failed to deserialize OpenAI parser response", e);
         }

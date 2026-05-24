@@ -9,6 +9,8 @@ import com.example.fitnessbot.parser.TrainingDayTitleNormalizer;
 import com.example.fitnessbot.repository.ExerciseRepository;
 import com.example.fitnessbot.repository.TrainingDayRepository;
 import com.example.fitnessbot.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,8 @@ import java.util.Optional;
  */
 @Service
 public class TrainingDayService {
+
+    private static final Logger log = LoggerFactory.getLogger(TrainingDayService.class);
 
     private final TrainingDayParser parser;
     private final OpenAiTrainingDayParser openAiTrainingDayParser;
@@ -99,6 +103,15 @@ public class TrainingDayService {
             parserInput = aiParserRawText;
         }
 
+        String parserName = user.isUseAiParser() ? "OpenAI" : "deterministic";
+        log.info(
+                "Parsing training day for Telegram user {} with {} parser (raw text {} chars, parser input {} chars)",
+                telegramUserId,
+                parserName,
+                rawText.length(),
+                parserInput.length()
+        );
+
         TrainingDay parsedTrainingDay = user.isUseAiParser()
                 ? openAiTrainingDayParser.parse(parserInput)
                 : parser.parse(rawText);
@@ -140,6 +153,13 @@ public class TrainingDayService {
             savedTrainingDay.getExercises().forEach(exercise -> exercise.setTrainingDay(savedTrainingDay));
         }
 
+        log.info(
+                "Saved training day {} for Telegram user {} with {} parser ({} exercise(s))",
+                savedTrainingDay.getId(),
+                telegramUserId,
+                parserName,
+                savedTrainingDay.getExercises() == null ? 0 : savedTrainingDay.getExercises().size()
+        );
         return savedTrainingDay;
     }
 

@@ -64,6 +64,79 @@ class TrainingDayWorkbookParserTest {
         assertThat(result.get(2).rawText()).doesNotContain("- Exercise");
     }
 
+    @Test
+    void parsesIndexedRussianTemplateRowsAndGroupHeaders() throws Exception {
+        byte[] workbookBytes;
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Треня 1");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("№");
+            header.createCell(1).setCellValue("Упражнения");
+            header.createCell(2).setCellValue("Объем");
+            header.createCell(3).setCellValue("Интенсивность (Вес, %, ИВН, ПВЗ)");
+            header.createCell(4).setCellValue("Темп");
+            header.createCell(5).setCellValue("Отдых");
+            header.createCell(6).setCellValue("Комментарий");
+
+            sheet.createRow(1).createCell(0).setCellValue("Dynamic warmup (выполняем 2-3 круга)");
+
+            Row warmupExercise = sheet.createRow(2);
+            warmupExercise.createCell(0).setCellValue(1);
+            warmupExercise.createCell(1).setCellValue("Frankenstein walk");
+            warmupExercise.createCell(2).setCellValue("x 6+6");
+
+            sheet.createRow(3).createCell(0).setCellValue("Activation (2 круга)");
+
+            Row activationExercise = sheet.createRow(4);
+            activationExercise.createCell(0).setCellValue("1b");
+            activationExercise.createCell(1).setCellValue("ER shoulders hold");
+            activationExercise.createCell(2).setCellValue("x 20 sec");
+            activationExercise.createCell(3).setCellValue("ИВН 7");
+            activationExercise.createCell(5).setCellValue("0-30 sec");
+            activationExercise.createCell(6).setCellValue("Локоть прижат к корпусу");
+
+            sheet.createRow(5).createCell(0).setCellValue("Power upper");
+
+            Row powerExercise = sheet.createRow(6);
+            powerExercise.createCell(0).setCellValue(1);
+            powerExercise.createCell(1).setCellValue("Chest med ball throws");
+            powerExercise.createCell(2).setCellValue("4 x 5");
+            powerExercise.createCell(3).setCellValue("МПУ 100%");
+            powerExercise.createCell(5).setCellValue("2 мин");
+            powerExercise.createCell(6).setCellValue("Strength unilateral lower");
+            powerExercise.createCell(7).setCellValue("8;8");
+
+            Row strengthExercise = sheet.createRow(7);
+            strengthExercise.createCell(0).setCellValue(1);
+            strengthExercise.createCell(1).setCellValue("Bulgarian split squat");
+            strengthExercise.createCell(2).setCellValue("3 x 6");
+            strengthExercise.createCell(3).setCellValue("ПВР 3");
+
+            workbookBytes = write(workbook);
+        }
+
+        List<TrainingDayWorkbookParser.WorkbookTrainingDay> result =
+                parser.parse(new ByteArrayInputStream(workbookBytes));
+
+        assertThat(result).hasSize(1);
+        String rawText = result.getFirst().rawText();
+        assertThat(rawText).contains("Треня 1:");
+        assertThat(rawText).contains("Dynamic warmup (выполняем 2-3 круга):");
+        assertThat(rawText).contains("- Frankenstein walk x 6+6");
+        assertThat(rawText).contains("Activation (2 круга):");
+        assertThat(rawText).contains("- ER shoulders hold x 20 sec ИВН 7 0-30 sec Локоть прижат к корпусу");
+        assertThat(rawText).contains("Power upper:");
+        assertThat(rawText).contains("- Chest med ball throws 4 x 5 МПУ 100% 2 мин 8;8");
+        assertThat(rawText).contains("Strength unilateral lower:");
+        assertThat(rawText).contains("- Bulgarian split squat 3 x 6 ПВР 3");
+        assertThat(rawText).doesNotContain("Упражнения");
+        assertThat(rawText).doesNotContain("- 1 Frankenstein walk");
+        assertThat(rawText).doesNotContain("Strength unilateral lower 8;8");
+        assertThat(result.getFirst().aiRawText()).contains("Section: Dynamic warmup (выполняем 2-3 круга)");
+        assertThat(result.getFirst().aiRawText()).contains("Section: Strength unilateral lower");
+        assertThat(result.getFirst().aiRawText()).contains("1 | Chest med ball throws | 4 x 5 | МПУ 100% | 2 мин | 8;8");
+    }
+
     private byte[] write(XSSFWorkbook workbook) throws Exception {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         workbook.write(outputStream);
