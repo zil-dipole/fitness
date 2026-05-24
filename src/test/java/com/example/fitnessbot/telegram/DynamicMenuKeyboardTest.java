@@ -55,7 +55,7 @@ class DynamicMenuKeyboardTest {
         List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
         assertThat(keyboard).hasSize(2);
         assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getText)
-                .containsExactly("Finish Program", "Cancel Program");
+                .containsExactly("Finish Program Creation", "Cancel Program Creation");
         assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getCallbackData)
                 .containsExactly("finish_program", "cancel_program");
         assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getText)
@@ -72,7 +72,7 @@ class DynamicMenuKeyboardTest {
         sessionManager.startSession(TEST_USER_ID, program);
 
         InlineKeyboardMarkup withSession = menuKeyboardFactory.createMainMenuKeyboard(TEST_USER_ID);
-        assertThat(withSession.getKeyboard().getFirst().getFirst().getText()).isEqualTo("Finish Program");
+        assertThat(withSession.getKeyboard().getFirst().getFirst().getText()).isEqualTo("Finish Program Creation");
 
         sessionManager.endSession(TEST_USER_ID);
 
@@ -93,5 +93,23 @@ class DynamicMenuKeyboardTest {
                 .containsExactly("Создать программу", "Мои программы");
         assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getText)
                 .containsExactly("Язык", "Помощь");
+    }
+
+    @Test
+    void testMainMenuUsesRussianDraftSessionLabels() {
+        UserLanguageService languageService = mock(UserLanguageService.class);
+        when(languageService.getLanguage(TEST_USER_ID)).thenReturn(UserLanguage.RUSSIAN);
+        DefaultMenuKeyboardFactory russianFactory = new DefaultMenuKeyboardFactory(sessionManager, languageService);
+        Program program = new Program();
+        program.setName("Тестовая программа");
+        sessionManager.startSession(TEST_USER_ID, program);
+
+        InlineKeyboardMarkup markup = russianFactory.createMainMenuKeyboard(TEST_USER_ID);
+
+        List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
+        assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getText)
+                .containsExactly("Завершить создание программы", "Отменить создание программы");
+        assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getCallbackData)
+                .containsExactly("finish_program", "cancel_program");
     }
 }

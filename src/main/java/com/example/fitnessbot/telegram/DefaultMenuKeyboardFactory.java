@@ -51,7 +51,7 @@ public class DefaultMenuKeyboardFactory implements MenuKeyboardFactory {
             rows.add(firstRow);
         }
 
-        // Cancel/Finish Program (only shown when active session exists)
+        // Cancel/Finish Program Creation (only shown when active session exists)
         if (sessionManager.hasActiveSession(userId)) {
             List<InlineKeyboardButton> sessionControlRow = new ArrayList<>();
 

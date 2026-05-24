@@ -46,8 +46,8 @@ public class CommandMessages {
     public static final String MENU_TITLE = "📋 Main Menu";
     public static final String MENU_CREATE_PROGRAM = "Create Program";
     public static final String MENU_VIEW_PROGRAMS = "View Programs";
-    public static final String MENU_FINISH_PROGRAM = "Finish Program";
-    public static final String MENU_CANCEL_PROGRAM = "Cancel Program";
+    public static final String MENU_FINISH_PROGRAM = "Finish Program Creation";
+    public static final String MENU_CANCEL_PROGRAM = "Cancel Program Creation";
     public static final String MENU_HELP = "Help";
     public static final String MENU_COMMAND_PLACEHOLDER = "cmd:";
         

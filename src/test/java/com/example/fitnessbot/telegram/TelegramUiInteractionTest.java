@@ -153,11 +153,11 @@ class TelegramUiInteractionTest {
         assertEquals(2, keyboard.get(1).size()); // Language + Help buttons
 
         InlineKeyboardButton finishBtn = keyboard.get(0).get(0);
-        assertEquals("Finish Program", finishBtn.getText());
+        assertEquals("Finish Program Creation", finishBtn.getText());
         assertEquals("finish_program", finishBtn.getCallbackData());
 
         InlineKeyboardButton cancelBtn = keyboard.get(0).get(1);
-        assertEquals("Cancel Program", cancelBtn.getText());
+        assertEquals("Cancel Program Creation", cancelBtn.getText());
         assertEquals("cancel_program", cancelBtn.getCallbackData());
     }
 
@@ -201,11 +201,11 @@ class TelegramUiInteractionTest {
         InlineKeyboardMarkup markup2 = (InlineKeyboardMarkup) sentMessage2.getReplyMarkup();
         List<List<InlineKeyboardButton>> keyboard2 = markup2.getKeyboard();
 
-        // Should have Finish Program button instead
+        // Should have Finish Program Creation button instead
         boolean hasFinishButton = false;
         for (List<InlineKeyboardButton> row : keyboard2) {
             for (InlineKeyboardButton button : row) {
-                if ("Finish Program".equals(button.getText())) {
+                if ("Finish Program Creation".equals(button.getText())) {
                     hasFinishButton = true;
                     break;
                 }
@@ -390,8 +390,8 @@ class TelegramUiInteractionTest {
 
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
-                        && message.getText().contains("Send or forward another day, or tap \"Finish Program\"")
-                        && message.getText().contains("Finish Program")
+                        && message.getText().contains("Send or forward another day, or tap \"Finish Program Creation\"")
+                        && message.getText().contains("Finish Program Creation")
                         && message.getReplyMarkup() instanceof InlineKeyboardMarkup
         ));
     }
@@ -429,7 +429,7 @@ class TelegramUiInteractionTest {
 
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
-                        && message.getText().contains("Send or forward another day, or tap \"Finish Program\"")
+                        && message.getText().contains("Send or forward another day, or tap \"Finish Program Creation\"")
         ));
         assertTrue(captor.getAllValues().stream().anyMatch(message ->
                 message.getText() != null
