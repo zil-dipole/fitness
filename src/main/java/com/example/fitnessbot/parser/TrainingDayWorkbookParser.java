@@ -310,7 +310,7 @@ public class TrainingDayWorkbookParser {
 
     private List<String> valuesToSpreadsheetLines(List<String> values, List<String> nextValues) {
         if (values.size() == 1 && isGroupHeader(values.getFirst())) {
-            return List.of("Section: " + values.getFirst());
+            return List.of(toSectionLine(values.getFirst()));
         }
 
         int indexOffset = values.size() > 1 && isExerciseIndex(values.getFirst()) ? 1 : 0;
@@ -319,7 +319,7 @@ public class TrainingDayWorkbookParser {
         if (headerIndex >= 0) {
             List<String> valuesWithoutHeader = new ArrayList<>(values);
             String header = valuesWithoutHeader.remove(headerIndex + indexOffset);
-            return List.of(valuesToSpreadsheetLine(valuesWithoutHeader), "Section: " + header);
+            return List.of(valuesToSpreadsheetLine(valuesWithoutHeader), toSectionLine(header));
         }
         return List.of(valuesToSpreadsheetLine(values));
     }

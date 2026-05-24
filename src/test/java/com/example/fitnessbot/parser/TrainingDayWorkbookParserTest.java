@@ -142,9 +142,17 @@ class TrainingDayWorkbookParserTest {
         assertThat(rawText).doesNotContain("Упражнения");
         assertThat(rawText).doesNotContain("- 1 Frankenstein walk");
         assertThat(rawText).doesNotContain("Strength unilateral lower 8;8");
-        assertThat(result.getFirst().aiRawText()).contains("Section: Dynamic warmup (выполняем 2-3 круга)");
-        assertThat(result.getFirst().aiRawText()).contains("Section: Strength unilateral lower");
+        assertThat(result.getFirst().aiRawText()).contains("Dynamic warmup (выполняем 2-3 круга):");
+        assertThat(result.getFirst().aiRawText()).contains("Strength unilateral lower:");
         assertThat(result.getFirst().aiRawText()).contains("1 | Chest med ball throws | 4 x 5 | МПУ 100% | 2 мин | 8;8");
+
+        var parsedTrainingDay = new TrainingDayParser().parse(rawText);
+        var dynamicWarmupExercise = parsedTrainingDay.getExercises().stream()
+                .filter(exercise -> exercise.getName().contains("Frankenstein walk"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(dynamicWarmupExercise.getSection()).isEqualTo("Dynamic warmup (выполняем 2-3 круга)");
+        assertThat(dynamicWarmupExercise.getNotes()).contains("Dynamic warmup (выполняем 2-3 круга)");
     }
 
     private byte[] write(XSSFWorkbook workbook) throws Exception {

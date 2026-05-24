@@ -74,8 +74,9 @@ public class OpenAiTrainingDayParser {
             20. Input may come from an Excel sheet. In that case, lines may describe spreadsheet rows with cells separated by ` | `. Use header cells such as Exercise, Sets, Reps, Duration, Notes, Video, Section, or their Russian equivalents to map row values.
             21. For spreadsheet rows, each visible sheet is one training day. Use the sheet name as title when no better title is present.
             22. Excel hyperlinks may be appended after the visible cell text, for example `Bench press https://example.com/demo | 3 | 8`. Treat those URLs as belonging to that exercise, put them in `videoUrls`, and remove them from `name`.
-            23. Do not invent exercises or fields.
-            24. Return valid JSON only.
+            23. In spreadsheet input, a line ending with `:` is a section header for all following exercise rows until the next section header. Do not create an exercise from that section line.
+            24. Do not invent exercises or fields.
+            25. Return valid JSON only.
             """;
 
     private static final String TRAINING_DAY_SCHEMA = """
