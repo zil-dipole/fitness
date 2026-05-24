@@ -152,7 +152,7 @@ SSH_OPTS=(
 )
 
 ssh_cmd() {
-  ssh "${SSH_OPTS[@]}" "$REMOTE" "$@"
+  ssh -t "${SSH_OPTS[@]}" "$REMOTE" "$@"
 }
 
 if [[ "$BUILD_IMAGE" == "1" ]]; then
