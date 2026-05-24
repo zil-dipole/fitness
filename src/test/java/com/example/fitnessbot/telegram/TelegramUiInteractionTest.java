@@ -9,6 +9,7 @@ import com.example.fitnessbot.service.ProgramService;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.commands.*;
+import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -488,12 +489,16 @@ class TelegramUiInteractionTest {
                 .processForwardedMessage(eq(USER_ID), rawTextCaptor.capture(), aiRawTextCaptor.capture());
         assertEquals(2, sessionManager.getSession(USER_ID).getTrainingDaysCount());
         assertTrue(rawTextCaptor.getAllValues().get(0).contains("Upper Body:"));
-        assertTrue(rawTextCaptor.getAllValues().get(0).contains("- Bench press 3 x 8"));
+        assertTrue(rawTextCaptor.getAllValues().get(0).contains(
+                "- Bench press https://example.com/bench 3 x 8"
+        ));
         assertTrue(rawTextCaptor.getAllValues().get(1).contains("Lower Body:"));
         assertTrue(rawTextCaptor.getAllValues().get(1).contains("- Squat 4 x 5"));
         assertTrue(aiRawTextCaptor.getAllValues().get(0).contains("Sheet: Upper Body"));
         assertTrue(aiRawTextCaptor.getAllValues().get(0).contains("Exercise | Sets | Reps"));
-        assertTrue(aiRawTextCaptor.getAllValues().get(0).contains("Bench press | 3 | 8"));
+        assertTrue(aiRawTextCaptor.getAllValues().get(0).contains(
+                "Bench press https://example.com/bench | 3 | 8"
+        ));
         assertTrue(aiRawTextCaptor.getAllValues().get(1).contains("Sheet: Lower Body"));
         assertTrue(aiRawTextCaptor.getAllValues().get(1).contains("Squat | 4 | 5"));
 
@@ -599,7 +604,11 @@ class TelegramUiInteractionTest {
             upper.getRow(0).createCell(1).setCellValue("Sets");
             upper.getRow(0).createCell(2).setCellValue("Reps");
             Row bench = upper.createRow(1);
-            bench.createCell(0).setCellValue("Bench press");
+            var benchCell = bench.createCell(0);
+            benchCell.setCellValue("Bench press");
+            var benchLink = workbook.getCreationHelper().createHyperlink(HyperlinkType.URL);
+            benchLink.setAddress("https://example.com/bench");
+            benchCell.setHyperlink(benchLink);
             bench.createCell(1).setCellValue(3);
             bench.createCell(2).setCellValue(8);
 

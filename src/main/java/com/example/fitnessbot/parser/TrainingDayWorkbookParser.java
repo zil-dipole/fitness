@@ -3,6 +3,7 @@ package com.example.fitnessbot.parser;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
+import org.apache.poi.ss.usermodel.Hyperlink;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -166,12 +167,29 @@ public class TrainingDayWorkbookParser {
                 continue;
             }
 
-            String value = formatter.formatCellValue(cell, evaluator).trim().replaceAll("\\s+", " ");
+            String value = cellTextWithHyperlink(cell, formatter, evaluator);
             if (!value.isBlank()) {
                 values.add(truncateCellText(value));
             }
         }
         return values;
+    }
+
+    private String cellTextWithHyperlink(Cell cell, DataFormatter formatter, FormulaEvaluator evaluator) {
+        String value = formatter.formatCellValue(cell, evaluator).trim().replaceAll("\\s+", " ");
+        Hyperlink hyperlink = cell.getHyperlink();
+        if (hyperlink == null || hyperlink.getAddress() == null || hyperlink.getAddress().isBlank()) {
+            return value;
+        }
+
+        String hyperlinkAddress = hyperlink.getAddress().trim();
+        if (value.contains(hyperlinkAddress)) {
+            return value;
+        }
+        if (value.isBlank()) {
+            return hyperlinkAddress;
+        }
+        return value + " " + hyperlinkAddress;
     }
 
     private List<String> rowToLines(List<String> values, List<String> nextValues) {

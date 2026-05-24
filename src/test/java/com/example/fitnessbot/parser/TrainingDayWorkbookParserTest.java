@@ -1,5 +1,6 @@
 package com.example.fitnessbot.parser;
 
+import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -24,7 +25,11 @@ class TrainingDayWorkbookParserTest {
             upper.getRow(0).createCell(1).setCellValue("Sets");
             upper.getRow(0).createCell(2).setCellValue("Reps");
             Row upperExercise = upper.createRow(1);
-            upperExercise.createCell(0).setCellValue("Bench press");
+            var benchPressCell = upperExercise.createCell(0);
+            benchPressCell.setCellValue("Bench press");
+            var benchPressLink = workbook.getCreationHelper().createHyperlink(HyperlinkType.URL);
+            benchPressLink.setAddress("https://example.com/bench");
+            benchPressCell.setHyperlink(benchPressLink);
             upperExercise.createCell(1).setCellValue(3);
             upperExercise.createCell(2).setCellValue(8);
             Row upperListedExercise = upper.createRow(2);
@@ -51,11 +56,16 @@ class TrainingDayWorkbookParserTest {
         assertThat(result).hasSize(3);
         assertThat(result.get(0).sheetName()).isEqualTo("Upper Body");
         assertThat(result.get(0).rawText()).contains("Upper Body:");
-        assertThat(result.get(0).rawText()).contains("- Bench press 3 x 8");
+        assertThat(result.get(0).rawText()).contains("- Bench press https://example.com/bench 3 x 8");
         assertThat(result.get(0).rawText()).contains("- Pull-ups 3 x 6");
         assertThat(result.get(0).aiRawText()).contains("Sheet: Upper Body");
         assertThat(result.get(0).aiRawText()).contains("Exercise | Sets | Reps");
-        assertThat(result.get(0).aiRawText()).contains("Bench press | 3 | 8");
+        assertThat(result.get(0).aiRawText()).contains("Bench press https://example.com/bench | 3 | 8");
+        assertThat(new TrainingDayParser().parse(result.get(0).rawText())
+                .getExercises()
+                .getFirst()
+                .getVideoUrls())
+                .containsExactly("https://example.com/bench");
         assertThat(result.get(1).rawText()).contains("Lower Body:");
         assertThat(result.get(1).rawText()).contains("Warm-up:");
         assertThat(result.get(1).rawText()).contains("- Hip thrust 2 x 12");
