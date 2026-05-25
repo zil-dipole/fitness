@@ -35,23 +35,6 @@ public class DefaultMenuKeyboardFactory implements MenuKeyboardFactory {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        // First row - Create Program (only shown when no active session)
-        if (!sessionManager.hasActiveSession(userId)) {
-            List<InlineKeyboardButton> firstRow = new ArrayList<>();
-            InlineKeyboardButton createProgramBtn = new InlineKeyboardButton();
-            createProgramBtn.setText(BotText.createProgramButton(language));
-            createProgramBtn.setCallbackData("create_program");
-            firstRow.add(createProgramBtn);
-
-            InlineKeyboardButton viewProgramsBtn = new InlineKeyboardButton();
-            viewProgramsBtn.setText(BotText.viewProgramsButton(language));
-            viewProgramsBtn.setCallbackData("view_programs");
-            firstRow.add(viewProgramsBtn);
-
-            rows.add(firstRow);
-        }
-
-        // Cancel/Finish Program Creation (only shown when active session exists)
         if (sessionManager.hasActiveSession(userId)) {
             List<InlineKeyboardButton> sessionControlRow = new ArrayList<>();
 
@@ -66,6 +49,28 @@ public class DefaultMenuKeyboardFactory implements MenuKeyboardFactory {
             sessionControlRow.add(cancelProgramBtn);
 
             rows.add(sessionControlRow);
+        } else if (sessionManager.isAwaitingProgramName(userId)) {
+            List<InlineKeyboardButton> pendingNameRow = new ArrayList<>();
+
+            InlineKeyboardButton cancelProgramBtn = new InlineKeyboardButton();
+            cancelProgramBtn.setText(BotText.cancelProgramButton(language));
+            cancelProgramBtn.setCallbackData("cancel_program");
+            pendingNameRow.add(cancelProgramBtn);
+
+            rows.add(pendingNameRow);
+        } else {
+            List<InlineKeyboardButton> firstRow = new ArrayList<>();
+            InlineKeyboardButton createProgramBtn = new InlineKeyboardButton();
+            createProgramBtn.setText(BotText.createProgramButton(language));
+            createProgramBtn.setCallbackData("create_program");
+            firstRow.add(createProgramBtn);
+
+            InlineKeyboardButton viewProgramsBtn = new InlineKeyboardButton();
+            viewProgramsBtn.setText(BotText.viewProgramsButton(language));
+            viewProgramsBtn.setCallbackData("view_programs");
+            firstRow.add(viewProgramsBtn);
+
+            rows.add(firstRow);
         }
 
         // Last row - language and help

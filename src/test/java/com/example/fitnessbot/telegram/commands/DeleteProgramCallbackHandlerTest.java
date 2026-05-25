@@ -1,7 +1,7 @@
 package com.example.fitnessbot.telegram.commands;
 
-import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.TestProgramCreationSessionManagers;
 import com.example.fitnessbot.telegram.DefaultMenuKeyboardFactory;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,8 @@ class DeleteProgramCallbackHandlerTest {
 
     @BeforeEach
     void setUp() {
-        MenuKeyboardFactory menuKeyboardFactory = new DefaultMenuKeyboardFactory(new ProgramCreationSessionManager());
+        MenuKeyboardFactory menuKeyboardFactory =
+                new DefaultMenuKeyboardFactory(TestProgramCreationSessionManagers.redisBacked());
         handler = new DeleteProgramCallbackHandler(programService, menuKeyboardFactory);
     }
 

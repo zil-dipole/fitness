@@ -283,7 +283,10 @@ printf 'Pulling app image: '
 awk -F= '$1 == "APP_IMAGE" { print $2; found = 1 } END { if (!found) print "mghostl/fitness-bot:latest" }' .env
 
 docker compose pull app postgres redis
-docker compose up -d
+docker compose up -d postgres redis app
+
+printf 'Redis ping: '
+docker compose exec -T redis redis-cli ping
 
 if [[ "$INSTALL_SYSTEMD" == "1" ]]; then
   tmp_service="$(mktemp)"

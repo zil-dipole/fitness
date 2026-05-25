@@ -62,7 +62,7 @@ class FinishProgramCommandHandlerTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).isEqualTo("There isn't a program draft in progress.\n\nStart one with /create_program <program_name>.");
+        assertThat(response.getText()).isEqualTo("There isn't a program draft in progress.\n\nStart one from the menu or with /create_program.");
     }
 
     @Test
@@ -74,7 +74,7 @@ class FinishProgramCommandHandlerTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).isEqualTo("There isn't a program draft in progress.\n\nStart one with /create_program <program_name>.");
+        assertThat(response.getText()).isEqualTo("There isn't a program draft in progress.\n\nStart one from the menu or with /create_program.");
 
         verify(sessionManager).hasActiveSession(TEST_TELEGRAM_ID);
         verifyNoMoreInteractions(sessionManager);

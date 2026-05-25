@@ -130,7 +130,7 @@ sudo systemctl stop fitness-bot
 
 ```bash
 cd /opt/fitness-bot/deploy
-docker compose pull app
+docker compose pull app postgres redis
 sudo systemctl reload fitness-bot
 ```
 

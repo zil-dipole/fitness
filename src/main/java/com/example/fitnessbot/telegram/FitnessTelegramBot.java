@@ -2,6 +2,7 @@ package com.example.fitnessbot.telegram;
 
 import com.example.fitnessbot.exception.TrainingDayException;
 import com.example.fitnessbot.exception.ProgramException;
+import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.TrainingDay;
 import com.example.fitnessbot.model.UserLanguage;
 import com.example.fitnessbot.exception.WorkoutException;
@@ -161,14 +162,18 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         recordTelegramUser(update);
 
+        if (update.hasMessage() && update.getMessage().hasText() && update.getMessage().getText().startsWith("/")) {
+            handleCommand(update);
+        }
+        // Handle the program name immediately after the user starts creating a program from the menu.
+        else if (update.hasMessage() && update.getMessage().hasText() &&
+                sessionManager.isAwaitingProgramName(update.getMessage().getFrom().getId())) {
+            handleProgramNameMessage(update);
+        }
         // Handle forwarded messages
-        if (update.hasMessage() && update.getMessage().hasText() &&
+        else if (update.hasMessage() && update.getMessage().hasText() &&
                 (update.getMessage().getForwardFrom() != null || update.getMessage().getForwardFromChat() != null)) {
             handleForwardedMessage(update);
-        }
-        // Handle commands
-        else if (update.hasMessage() && update.getMessage().hasText() && update.getMessage().getText().startsWith("/")) {
-            handleCommand(update);
         }
         // Handle callback queries (button presses)
         else if (update.hasCallbackQuery()) {
@@ -496,6 +501,13 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
         SendMessage response = new SendMessage();
         response.setChatId(chatId.toString());
 
+        if (sessionManager.isAwaitingProgramName(userId)) {
+            response.setText(BotText.createProgramNamePrompt(language));
+            response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
+            sendDocumentResponse(response);
+            return;
+        }
+
         if (!sessionManager.hasActiveSession(userId)) {
             response.setText(BotText.excelUploadNeedsDraft(language));
             sendDocumentResponse(response);
@@ -615,6 +627,11 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
     private void handlePlainTextMessage(Update update) {
         Long userId = update.getMessage().getFrom().getId();
         var language = BotText.language(languageService, userId);
+        if (sessionManager.isAwaitingProgramName(userId)) {
+            handleProgramNameMessage(update);
+            return;
+        }
+
         if (sessionManager.hasActiveSession(userId)) {
             handleTrainingDayMessageDuringProgramCreation(update);
             return;
@@ -666,6 +683,49 @@ public class FitnessTelegramBot extends TelegramLongPollingBot {
                 sendTelegramMessage(response);
             } catch (Exception telegramApiException) {
                 log.error("Failed to send workout error message to user", telegramApiException);
+            }
+        }
+    }
+
+    private void handleProgramNameMessage(Update update) {
+        Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
+        String programName = update.getMessage().getText() == null ? "" : update.getMessage().getText().trim();
+
+        SendMessage response = new SendMessage();
+        response.setChatId(update.getMessage().getChatId().toString());
+
+        if (programName.isEmpty()) {
+            response.setText(BotText.createProgramNameEmpty(language));
+            response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
+            try {
+                sendTelegramMessage(response);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send program name prompt to user", telegramApiException);
+            }
+            return;
+        }
+
+        try {
+            Program program = programService.startProgramCreation(userId, programName);
+            sessionManager.startSession(userId, program);
+            response.setText(BotText.programDraftCreated(program.getName(), language));
+            response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
+            sendTelegramMessage(response);
+        } catch (ProgramException e) {
+            response.setText("❌ " + e.getMessage());
+            try {
+                sendTelegramMessage(response);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send program creation error to user", telegramApiException);
+            }
+        } catch (Exception e) {
+            log.error("Failed to create program from prompted name for user {}", userId, e);
+            response.setText(BotText.createProgramGenericError(language));
+            try {
+                sendTelegramMessage(response);
+            } catch (Exception telegramApiException) {
+                log.error("Failed to send program creation error to user", telegramApiException);
             }
         }
     }

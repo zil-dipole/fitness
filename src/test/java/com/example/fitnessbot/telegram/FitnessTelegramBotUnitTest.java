@@ -3,6 +3,7 @@ package com.example.fitnessbot.telegram;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramRenameSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.TestProgramCreationSessionManagers;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.MenuKeyboardFactory;
@@ -60,7 +61,7 @@ class FitnessTelegramBotUnitTest {
                 trainingDayService,
                 workoutService,
                 programService,
-                new ProgramCreationSessionManager(),
+                TestProgramCreationSessionManagers.redisBacked(),
                 new ProgramRenameSessionManager(),
                 commandHandlers,
                 callbackQueryHandlers,

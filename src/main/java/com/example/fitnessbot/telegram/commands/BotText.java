@@ -92,6 +92,14 @@ public final class BotText {
         return msg("createProgram.unavailable", language);
     }
 
+    public static String createProgramNamePrompt(UserLanguage language) {
+        return msg("createProgram.name.prompt", language);
+    }
+
+    public static String createProgramNameEmpty(UserLanguage language) {
+        return msg("createProgram.name.empty", language);
+    }
+
     public static String programDraftCreated(String programName, UserLanguage language) {
         return msg("createProgram.success", language, programName, finishProgramButton(language));
     }

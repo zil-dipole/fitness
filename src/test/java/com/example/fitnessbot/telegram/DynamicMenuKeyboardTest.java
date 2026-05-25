@@ -3,6 +3,7 @@ package com.example.fitnessbot.telegram;
 import com.example.fitnessbot.model.Program;
 import com.example.fitnessbot.model.UserLanguage;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
+import com.example.fitnessbot.service.TestProgramCreationSessionManagers;
 import com.example.fitnessbot.service.UserLanguageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class DynamicMenuKeyboardTest {
 
     @BeforeEach
     void setUp() {
-        sessionManager = new ProgramCreationSessionManager();
+        sessionManager = TestProgramCreationSessionManagers.redisBacked();
         menuKeyboardFactory = new DefaultMenuKeyboardFactory(sessionManager);
     }
 
@@ -58,6 +59,22 @@ class DynamicMenuKeyboardTest {
                 .containsExactly("Finish Program Creation", "Cancel Program Creation");
         assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getCallbackData)
                 .containsExactly("finish_program", "cancel_program");
+        assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getText)
+                .containsExactly("Language", "Help");
+    }
+
+    @Test
+    void testMainMenuWhileWaitingForProgramName() {
+        sessionManager.startAwaitingProgramName(TEST_USER_ID);
+
+        InlineKeyboardMarkup markup = menuKeyboardFactory.createMainMenuKeyboard(TEST_USER_ID);
+
+        List<List<InlineKeyboardButton>> keyboard = markup.getKeyboard();
+        assertThat(keyboard).hasSize(2);
+        assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getText)
+                .containsExactly("Cancel Program Creation");
+        assertThat(keyboard.get(0)).extracting(InlineKeyboardButton::getCallbackData)
+                .containsExactly("cancel_program");
         assertThat(keyboard.get(1)).extracting(InlineKeyboardButton::getText)
                 .containsExactly("Language", "Help");
     }

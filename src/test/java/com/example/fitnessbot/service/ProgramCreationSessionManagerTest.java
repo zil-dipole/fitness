@@ -11,6 +11,65 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProgramCreationSessionManagerTest {
 
     @Test
+    void awaitingProgramNameIsClearedWhenDraftSessionStarts() {
+        ProgramCreationSessionManager manager = TestProgramCreationSessionManagers.redisBacked();
+        Program program = new Program();
+
+        manager.startAwaitingProgramName(123L);
+        assertThat(manager.isAwaitingProgramName(123L)).isTrue();
+        assertThat(manager.hasProgramCreationInProgress(123L)).isTrue();
+
+        manager.startSession(123L, program);
+
+        assertThat(manager.isAwaitingProgramName(123L)).isFalse();
+        assertThat(manager.hasActiveSession(123L)).isTrue();
+        assertThat(manager.hasProgramCreationInProgress(123L)).isTrue();
+    }
+
+    @Test
+    void endingSessionAlsoClearsPendingProgramNamePrompt() {
+        ProgramCreationSessionManager manager = TestProgramCreationSessionManagers.redisBacked();
+
+        manager.startAwaitingProgramName(123L);
+        manager.endSession(123L);
+
+        assertThat(manager.isAwaitingProgramName(123L)).isFalse();
+        assertThat(manager.hasProgramCreationInProgress(123L)).isFalse();
+    }
+
+    @Test
+    void redisBackedSessionPersistsPromptStateAndDraftSnapshot() {
+        ProgramCreationSessionManager manager = TestProgramCreationSessionManagers.redisBacked();
+        Program program = new Program();
+        program.setId(77L);
+        program.setName("Redis Program");
+
+        manager.startAwaitingProgramName(123L);
+        assertThat(manager.isAwaitingProgramName(123L)).isTrue();
+
+        manager.startSession(123L, program);
+        assertThat(manager.isAwaitingProgramName(123L)).isFalse();
+        assertThat(manager.hasActiveSession(123L)).isTrue();
+
+        ProgramCreationSessionManager.ProgramCreationSession session = manager.getSession(123L);
+        session.addTrainingDay(trainingDay(10L, "Upper Body"));
+
+        ProgramCreationSessionManager.ProgramCreationSession reloaded = manager.getSession(123L);
+        assertThat(reloaded.getProgram().getId()).isEqualTo(77L);
+        assertThat(reloaded.getProgram().getName()).isEqualTo("Redis Program");
+        assertThat(reloaded.getTrainingDays()).extracting(TrainingDay::getTitle).containsExactly("Upper Body");
+
+        reloaded.addTrainingDay(trainingDay(10L, "Updated Upper Body"));
+        assertThat(manager.getSession(123L).getTrainingDays())
+                .extracting(TrainingDay::getTitle)
+                .containsExactly("Updated Upper Body");
+
+        manager.endSession(123L);
+        assertThat(manager.hasActiveSession(123L)).isFalse();
+        assertThat(manager.getSession(123L)).isNull();
+    }
+
+    @Test
     void trainingDaysPreserveForwardOrderInsteadOfIdOrder() {
         Program program = new Program();
         ProgramCreationSessionManager.ProgramCreationSession session =
@@ -46,4 +105,5 @@ class ProgramCreationSessionManagerTest {
         trainingDay.setTitle(title);
         return trainingDay;
     }
+
 }

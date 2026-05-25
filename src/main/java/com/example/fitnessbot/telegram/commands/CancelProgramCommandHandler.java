@@ -42,7 +42,7 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public boolean isAvailable(Long userId, ProgramCreationSessionManager sessionManager) {
-        return sessionManager.hasActiveSession(userId);
+        return sessionManager.hasProgramCreationInProgress(userId);
     }
 
     @Override
@@ -59,15 +59,13 @@ public class CancelProgramCommandHandler implements ContextAwareCommandHandler {
         Long userId = update.getMessage().getFrom().getId();
         var language = BotText.language(languageService, userId);
 
-        // Check if user has an active session
-        if (!sessionManager.hasActiveSession(userId)) {
+        if (!sessionManager.hasProgramCreationInProgress(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
             response.setText(BotText.cancelProgramNoSession(language));
             return response;
         }
 
-        // End the session
         sessionManager.endSession(userId);
 
         SendMessage response = new SendMessage();

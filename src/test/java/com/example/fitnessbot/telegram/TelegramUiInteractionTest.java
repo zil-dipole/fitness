@@ -6,6 +6,7 @@ import com.example.fitnessbot.model.User;
 import com.example.fitnessbot.service.ProgramCreationSessionManager;
 import com.example.fitnessbot.service.ProgramRenameSessionManager;
 import com.example.fitnessbot.service.ProgramService;
+import com.example.fitnessbot.service.TestProgramCreationSessionManagers;
 import com.example.fitnessbot.service.TrainingDayService;
 import com.example.fitnessbot.service.WorkoutService;
 import com.example.fitnessbot.telegram.commands.*;
@@ -55,7 +56,7 @@ class TelegramUiInteractionTest {
     @BeforeEach
     void setUp() throws Exception {
         // Create real instances for better testing of UI interactions
-        sessionManager = new ProgramCreationSessionManager();
+        sessionManager = TestProgramCreationSessionManagers.redisBacked();
         MenuKeyboardFactory menuKeyboardFactory = new DefaultMenuKeyboardFactory(sessionManager);
 
         List<CommandHandler> commandHandlers = List.of(
@@ -259,11 +260,6 @@ class TelegramUiInteractionTest {
 
     @Test
     void testCreateProgramCallbackQuery() throws Exception {
-        com.example.fitnessbot.model.Program program = new com.example.fitnessbot.model.Program();
-        program.setId(1L);
-        program.setName("My Program");
-        when(programService.startProgramCreation(USER_ID, "My Program")).thenReturn(program);
-
         Update update = createMockUpdateWithCallbackQuery("create_program");
         fitnessTelegramBot.onUpdateReceived(update);
 
@@ -272,9 +268,9 @@ class TelegramUiInteractionTest {
 
         SendMessage sentMessage = captor6.getValue();
         assertNotNull(sentMessage);
-        assertTrue(sentMessage.getText().contains("Program draft created"));
-        assertTrue(sentMessage.getText().contains("My Program"));
-        assertTrue(sessionManager.hasActiveSession(USER_ID));
+        assertTrue(sentMessage.getText().contains("What should this program be called?"));
+        assertFalse(sessionManager.hasActiveSession(USER_ID));
+        assertTrue(sessionManager.isAwaitingProgramName(USER_ID));
     }
 
     @Test
@@ -408,7 +404,14 @@ class TelegramUiInteractionTest {
         Update createUpdate = createMockUpdateWithCallbackQuery("create_program");
         fitnessTelegramBot.onUpdateReceived(createUpdate);
 
+        assertTrue(sessionManager.isAwaitingProgramName(USER_ID));
+        assertFalse(sessionManager.hasActiveSession(USER_ID));
+
+        Update nameUpdate = createMockUpdateWithCommand("My Program");
+        fitnessTelegramBot.onUpdateReceived(nameUpdate);
+
         assertTrue(sessionManager.hasActiveSession(USER_ID));
+        assertFalse(sessionManager.isAwaitingProgramName(USER_ID));
 
         Update forwardUpdate1 = createMockForwardedMessage("AI parsed day 1");
         fitnessTelegramBot.onUpdateReceived(forwardUpdate1);

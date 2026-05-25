@@ -41,13 +41,13 @@ class CancelProgramCommandHandlerTest {
 
     @Test
     void testIsAvailableWithActiveSession() {
-        when(sessionManager.hasActiveSession(TEST_TELEGRAM_ID)).thenReturn(true);
+        when(sessionManager.hasProgramCreationInProgress(TEST_TELEGRAM_ID)).thenReturn(true);
         assertThat(handler.isAvailable(TEST_TELEGRAM_ID, sessionManager)).isTrue();
     }
 
     @Test
     void testIsAvailableWithoutActiveSession() {
-        when(sessionManager.hasActiveSession(TEST_TELEGRAM_ID)).thenReturn(false);
+        when(sessionManager.hasProgramCreationInProgress(TEST_TELEGRAM_ID)).thenReturn(false);
         assertThat(handler.isAvailable(TEST_TELEGRAM_ID, sessionManager)).isFalse();
     }
 
@@ -68,7 +68,7 @@ class CancelProgramCommandHandlerTest {
     void testHandleWithoutActiveSession() {
         // Given
         Update update = createMockUpdateWithCommand();
-        when(sessionManager.hasActiveSession(TEST_TELEGRAM_ID)).thenReturn(false);
+        when(sessionManager.hasProgramCreationInProgress(TEST_TELEGRAM_ID)).thenReturn(false);
 
         // When
         SendMessage response = handler.handle(update);
@@ -78,7 +78,7 @@ class CancelProgramCommandHandlerTest {
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("There isn't a program draft to cancel");
         
-        verify(sessionManager).hasActiveSession(TEST_TELEGRAM_ID);
+        verify(sessionManager).hasProgramCreationInProgress(TEST_TELEGRAM_ID);
         verifyNoMoreInteractions(sessionManager);
     }
 
@@ -86,7 +86,7 @@ class CancelProgramCommandHandlerTest {
     void testHandleSuccess() {
         // Given
         Update update = createMockUpdateWithCommand();
-        when(sessionManager.hasActiveSession(TEST_TELEGRAM_ID)).thenReturn(true);
+        when(sessionManager.hasProgramCreationInProgress(TEST_TELEGRAM_ID)).thenReturn(true);
         doNothing().when(sessionManager).endSession(TEST_TELEGRAM_ID);
 
         // When

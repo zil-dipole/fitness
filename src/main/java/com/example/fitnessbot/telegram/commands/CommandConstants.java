@@ -19,7 +19,7 @@ public class CommandConstants {
     
     // FinishProgramCommandHandler messages
     public static final String FINISH_PROGRAM_NO_ACTIVE_SESSION = 
-        "You don't have an active program creation session. Start one with /create_program <program_name>";
+        "You don't have an active program creation session. Start one with /create_program";
     
     public static final String FINISH_PROGRAM_CONFIRMATION_HEADER = "🎉 Program completed successfully!";
     public static final String FINISH_PROGRAM_CONFIRMATION_DETAILS = 
@@ -34,7 +34,7 @@ public class CommandConstants {
     
     // ShowProgramCommandHandler messages
     public static final String SHOW_PROGRAM_NO_ACTIVE_SESSION = 
-        "You don't have an active program creation session. Start one with /create_program <name>";
+        "You don't have an active program creation session. Start one with /create_program";
     
     public static final String SHOW_PROGRAM_MARKDOWN_HEADER_START = "*Program Creation Session: ";
     public static final String SHOW_PROGRAM_MARKDOWN_HEADER_END = "*\n\n";

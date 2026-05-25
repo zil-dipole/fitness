@@ -51,16 +51,21 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
 
     @Override
     public boolean isAvailable(Long userId, ProgramCreationSessionManager sessionManager) {
-        // Create program is available only if user doesn't have an active session
-        return !sessionManager.hasActiveSession(userId);
+        // Create program is available only when no program creation flow is already in progress.
+        return !sessionManager.hasProgramCreationInProgress(userId);
     }
 
     @Override
     public SendMessage handleUnavailable(Update update) {
         SendMessage response = new SendMessage();
         response.setChatId(update.getMessage().getChatId().toString());
-        var language = BotText.language(languageService, update.getMessage().getFrom().getId());
-        response.setText(BotText.createProgramUnavailable(language));
+        Long userId = update.getMessage().getFrom().getId();
+        var language = BotText.language(languageService, userId);
+        if (sessionManager.isAwaitingProgramName(userId)) {
+            response.setText(BotText.createProgramNamePrompt(language));
+        } else {
+            response.setText(BotText.createProgramUnavailable(language));
+        }
         return response;
     }
 
@@ -70,20 +75,29 @@ public class CreateProgramCommandHandler implements ContextAwareCommandHandler {
         String messageText = update.getMessage().getText();
         var language = BotText.language(languageService, userId);
 
-        // Check if user already has an active session
-        if (sessionManager.hasActiveSession(userId)) {
+        if (sessionManager.hasProgramCreationInProgress(userId)) {
             SendMessage response = new SendMessage();
             response.setChatId(update.getMessage().getChatId().toString());
-            response.setText(BotText.createProgramUnavailable(language));
+            if (sessionManager.isAwaitingProgramName(userId)) {
+                response.setText(BotText.createProgramNamePrompt(language));
+            } else {
+                response.setText(BotText.createProgramUnavailable(language));
+            }
             return response;
         }
 
-        // Extract program name from command
-        String programName = "My Program";
         String[] parts = messageText.split(" ", 2);
-        if (parts.length > 1 && !parts[1].trim().isEmpty()) {
-            programName = parts[1].trim();
+        if (parts.length == 1 || parts[1].trim().isEmpty()) {
+            sessionManager.startAwaitingProgramName(userId);
+
+            SendMessage response = new SendMessage();
+            response.setChatId(update.getMessage().getChatId().toString());
+            response.setText(BotText.createProgramNamePrompt(language));
+            response.setReplyMarkup(menuKeyboardFactory.createMainMenuKeyboard(userId));
+            return response;
         }
+
+        String programName = parts[1].trim();
 
         try {
             // Create a new program

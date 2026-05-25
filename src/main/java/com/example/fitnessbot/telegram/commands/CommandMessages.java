@@ -18,7 +18,7 @@ public class CommandMessages {
     
     // FinishProgramCommandHandler messages
     public static final String FINISH_PROGRAM_NO_SESSION = 
-        "You don't have an active program creation session. Start one with /create_program <program_name>";
+        "You don't have an active program creation session. Start one with /create_program";
     public static final String FINISH_PROGRAM_SUCCESS_PREFIX = "🎉 Successfully created program: \"";
     public static final String FINISH_PROGRAM_SUCCESS_SUFFIX = 
         "\"!\n\nYou can now view your programs with /show_program.";
@@ -53,7 +53,7 @@ public class CommandMessages {
         
     // ShowProgramCommandHandler messages
     public static final String SHOW_PROGRAM_NO_SESSION = 
-        "You don't have an active program creation session. Start one with /create_program <name>";
+        "You don't have an active program creation session. Start one with /create_program";
     public static final String SHOW_PROGRAM_SESSION_TITLE_PREFIX = 
         "*Program Creation Session: ";
     public static final String SHOW_PROGRAM_SESSION_TITLE_SUFFIX = "*";

@@ -49,7 +49,8 @@ class CreateProgramCommandHandlerTest {
     void testHandleWithActiveSession() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program My Program");
-        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(true);
+        when(sessionManager.hasProgramCreationInProgress(TEST_USER_ID)).thenReturn(true);
+        when(sessionManager.isAwaitingProgramName(TEST_USER_ID)).thenReturn(false);
 
         // When
         SendMessage response = handler.handle(update);
@@ -59,7 +60,20 @@ class CreateProgramCommandHandlerTest {
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
         assertThat(response.getText()).contains("You already have a program draft in progress");
         
-        verify(sessionManager).hasActiveSession(TEST_USER_ID);
+        verify(sessionManager).hasProgramCreationInProgress(TEST_USER_ID);
+        verify(sessionManager).isAwaitingProgramName(TEST_USER_ID);
+        verifyNoMoreInteractions(programService, sessionManager);
+    }
+
+    @Test
+    void testHandleUnavailableWhileAwaitingProgramNamePromptsAgain() {
+        Update update = createMockUpdateForUnavailable();
+        when(sessionManager.isAwaitingProgramName(TEST_USER_ID)).thenReturn(true);
+
+        SendMessage response = handler.handleUnavailable(update);
+
+        assertThat(response.getText()).contains("What should this program be called?");
+        verify(sessionManager).isAwaitingProgramName(TEST_USER_ID);
         verifyNoMoreInteractions(programService, sessionManager);
     }
 
@@ -67,7 +81,7 @@ class CreateProgramCommandHandlerTest {
     void testHandleSuccessWithName() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program My Awesome Program");
-        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(false);
+        when(sessionManager.hasProgramCreationInProgress(TEST_USER_ID)).thenReturn(false);
 
         Program program = new Program();
         program.setId(1L);
@@ -90,6 +104,7 @@ class CreateProgramCommandHandlerTest {
         assertThat(response.getText()).contains("tap \"Finish Program Creation\" or send /finish_program");
 
         verify(programService).startProgramCreation(TEST_USER_ID, "My Awesome Program");
+        verify(sessionManager).hasProgramCreationInProgress(TEST_USER_ID);
         verify(sessionManager).startSession(TEST_USER_ID, program);
         verifyNoMoreInteractions(programService, sessionManager);
     }
@@ -98,17 +113,7 @@ class CreateProgramCommandHandlerTest {
     void testHandleSuccessWithoutName() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program");
-        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(false);
-
-        Program program = new Program();
-        program.setId(1L);
-        program.setName("My Program");
-        User user = new User();
-        user.setId(1L);
-        program.setUser(user);
-
-        when(programService.startProgramCreation(TEST_USER_ID, "My Program")).thenReturn(program);
-        doNothing().when(sessionManager).startSession(TEST_USER_ID, program);
+        when(sessionManager.hasProgramCreationInProgress(TEST_USER_ID)).thenReturn(false);
 
         // When
         SendMessage response = handler.handle(update);
@@ -116,10 +121,11 @@ class CreateProgramCommandHandlerTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).contains("Program draft created: \"My Program\"");
+        assertThat(response.getText()).contains("What should this program be called?");
 
-        verify(programService).startProgramCreation(TEST_USER_ID, "My Program");
-        verify(sessionManager).startSession(TEST_USER_ID, program);
+        verify(sessionManager).hasProgramCreationInProgress(TEST_USER_ID);
+        verify(sessionManager).startAwaitingProgramName(TEST_USER_ID);
+        verifyNoInteractions(programService);
         verifyNoMoreInteractions(programService, sessionManager);
     }
 
@@ -127,7 +133,7 @@ class CreateProgramCommandHandlerTest {
     void testHandleWithError() throws Exception {
         // Given
         Update update = createMockUpdateWithCommand("/create_program Test Program");
-        when(sessionManager.hasActiveSession(TEST_USER_ID)).thenReturn(false);
+        when(sessionManager.hasProgramCreationInProgress(TEST_USER_ID)).thenReturn(false);
         when(programService.startProgramCreation(TEST_USER_ID, "Test Program"))
                 .thenThrow(new RuntimeException("Database error"));
 
@@ -140,6 +146,7 @@ class CreateProgramCommandHandlerTest {
         assertThat(response.getText()).contains("Sorry, there was an error starting program creation");
 
         verify(programService).startProgramCreation(TEST_USER_ID, "Test Program");
+        verify(sessionManager).hasProgramCreationInProgress(TEST_USER_ID);
         verify(sessionManager, never()).startSession(anyLong(), any());
         verifyNoMoreInteractions(programService, sessionManager);
     }
@@ -151,6 +158,19 @@ class CreateProgramCommandHandlerTest {
 
         when(update.getMessage()).thenReturn(message);
         when(message.getText()).thenReturn(command);
+        when(message.getFrom()).thenReturn(user);
+        when(user.getId()).thenReturn(TEST_USER_ID);
+        when(message.getChatId()).thenReturn(TEST_CHAT_ID);
+
+        return update;
+    }
+
+    private Update createMockUpdateForUnavailable() {
+        Update update = mock(Update.class);
+        Message message = mock(Message.class);
+        org.telegram.telegrambots.meta.api.objects.User user = mock(org.telegram.telegrambots.meta.api.objects.User.class);
+
+        when(update.getMessage()).thenReturn(message);
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(TEST_USER_ID);
         when(message.getChatId()).thenReturn(TEST_CHAT_ID);

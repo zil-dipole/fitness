@@ -70,7 +70,7 @@ class ShowProgramCommandHandlerTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getChatId()).isEqualTo(String.valueOf(TEST_CHAT_ID));
-        assertThat(response.getText()).isEqualTo("Use /show_program to view saved programs or /create_program <name> to start a new one.");
+        assertThat(response.getText()).isEqualTo("Use /show_program to view saved programs or /create_program to start a new one.");
         
         // Verify that no unexpected interactions occurred
         verifyNoMoreInteractions(sessionManager);

@@ -2,7 +2,7 @@
 # Note: These settings will be overridden by TestContainers in integration tests
 
 spring:
-  # Redis Configuration (using embedded Redis for tests)
+  # Redis Configuration (overridden by Testcontainers in integration tests)
   data:
     redis:
       host: localhost
