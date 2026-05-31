@@ -152,7 +152,19 @@ class TrainingDayWorkbookParserTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(dynamicWarmupExercise.getSection()).isEqualTo("Dynamic warmup (выполняем 2-3 круга)");
+        assertThat(dynamicWarmupExercise.getName()).isEqualTo("Frankenstein walk");
+        assertThat(dynamicWarmupExercise.getRepsOrDuration()).isEqualTo("6+6");
         assertThat(dynamicWarmupExercise.getNotes()).contains("Dynamic warmup (выполняем 2-3 круга)");
+
+        var activationExercise = parsedTrainingDay.getExercises().stream()
+                .filter(exercise -> exercise.getName().contains("ER shoulders hold"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(activationExercise.getName()).isEqualTo("ER shoulders hold");
+        assertThat(activationExercise.getRepsOrDuration()).isEqualTo("20 sec");
+        assertThat(activationExercise.getNotes())
+                .contains("Activation (2 круга)")
+                .contains("ИВН 7 0-30 sec Локоть прижат к корпусу");
     }
 
     private byte[] write(XSSFWorkbook workbook) throws Exception {

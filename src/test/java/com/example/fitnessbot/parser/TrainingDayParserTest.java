@@ -43,14 +43,18 @@ class TrainingDayParserTest {
         // Check first exercise
         Exercise ex1 = exercises.get(0);
         assertThat(ex1.getSection()).isEqualTo("Активация разминка");
-        assertThat(ex1.getName()).isEqualTo("Гандболка с выпадами х20"); // The name includes the "х20" part because the parser doesn't separate it yet
+        assertThat(ex1.getName()).isEqualTo("Гандболка с выпадами");
+        assertThat(ex1.getRepsOrDuration()).isEqualTo("20");
+        assertThat(ex1.getNotes()).isEqualTo("(с видео)");
         assertThat(ex1.getVideoUrls()).hasSize(1);
         assertThat(ex1.getVideoUrls().get(0)).contains("youtube.com");
 
         // Check second exercise
         Exercise ex2 = exercises.get(1);
         assertThat(ex2.getSection()).isEqualTo("Активация разминка");
-        assertThat(ex2.getName()).isEqualTo("Пуловер лёжа х15");
+        assertThat(ex2.getName()).isEqualTo("Пуловер лёжа");
+        assertThat(ex2.getRepsOrDuration()).isEqualTo("15");
+        assertThat(ex2.getNotes()).isEqualTo("(с видео)");
 
         // Check third exercise
         Exercise ex3 = exercises.get(2);
@@ -429,11 +433,35 @@ class TrainingDayParserTest {
 
         assertThat(day.getExercises()).hasSize(5);
         assertThat(day.getExercises().get(1).getSection()).isEqualTo("ISO 3 круга");
-        assertThat(day.getExercises().get(1).getName()).isEqualTo("Copenhagen x 20 sec");
+        assertThat(day.getExercises().get(1).getName()).isEqualTo("Copenhagen");
+        assertThat(day.getExercises().get(1).getRepsOrDuration()).isEqualTo("20 sec");
         assertThat(day.getExercises().get(1).getVideoUrls()).containsExactly("https://youtu.be/tKb76R21AfM?si=K0cxuApwdAHxMtN4");
         assertThat(day.getExercises().get(1).getNotes()).isEqualTo("Круги: ISO 3 круга");
-        assertThat(day.getExercises().get(4).getName()).isEqualTo("Spanish squat x 45 sec");
+        assertThat(day.getExercises().get(4).getName()).isEqualTo("Spanish squat");
+        assertThat(day.getExercises().get(4).getRepsOrDuration()).isEqualTo("45 sec");
         assertThat(day.getExercises().get(4).getNotes()).isEqualTo("Круги: ISO 3 круга");
+    }
+
+    @Test
+    void testParseLeadingXRepsWithTrailingWorkbookNotes() {
+        String rawText = """
+                Accessory:
+                - Face pull x 15 ИВН 7-8 2112 Тяга к лицу, локти ВЫСОКО. В конечной точке — внешняя ротация, большие пальцы назад.
+                - Frankenstein walk x 6+6
+                """;
+
+        TrainingDay day = parser.parse(rawText);
+
+        assertThat(day.getExercises()).hasSize(2);
+        Exercise facePull = day.getExercises().getFirst();
+        assertThat(facePull.getName()).isEqualTo("Face pull");
+        assertThat(facePull.getRepsOrDuration()).isEqualTo("15");
+        assertThat(facePull.getNotes()).isEqualTo("ИВН 7-8 2112 Тяга к лицу, локти ВЫСОКО. В конечной точке — внешняя ротация, большие пальцы назад.");
+
+        Exercise frankensteinWalk = day.getExercises().get(1);
+        assertThat(frankensteinWalk.getName()).isEqualTo("Frankenstein walk");
+        assertThat(frankensteinWalk.getRepsOrDuration()).isEqualTo("6+6");
+        assertThat(frankensteinWalk.getNotes()).isNull();
     }
 
     @Test

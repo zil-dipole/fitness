@@ -71,7 +71,9 @@ class TrainingDayServiceIntegrationTest extends AbstractWithDbTest {
         // Check first exercise
         Exercise ex1 = result.getExercises().get(0);
         assertThat(ex1.getSection()).isEqualTo("Активация разминка");
-        assertThat(ex1.getName()).isEqualTo("Гандболка с выпадами х20"); // The name includes the "х20" part because the parser doesn't separate it yet
+        assertThat(ex1.getName()).isEqualTo("Гандболка с выпадами");
+        assertThat(ex1.getRepsOrDuration()).isEqualTo("20");
+        assertThat(ex1.getNotes()).isEqualTo("(с видео)");
         assertThat(ex1.getPosition()).isEqualTo(0);
         assertThat(ex1.getVideoUrls()).hasSize(1);
         assertThat(ex1.getVideoUrls().get(0)).contains("youtube.com");
@@ -79,7 +81,9 @@ class TrainingDayServiceIntegrationTest extends AbstractWithDbTest {
         // Check second exercise
         Exercise ex2 = result.getExercises().get(1);
         assertThat(ex2.getSection()).isEqualTo("Активация разминка");
-        assertThat(ex2.getName()).isEqualTo("Пуловер лёжа х15");
+        assertThat(ex2.getName()).isEqualTo("Пуловер лёжа");
+        assertThat(ex2.getRepsOrDuration()).isEqualTo("15");
+        assertThat(ex2.getNotes()).isEqualTo("(с видео)");
         assertThat(ex2.getPosition()).isEqualTo(1);
 
         // Check third exercise

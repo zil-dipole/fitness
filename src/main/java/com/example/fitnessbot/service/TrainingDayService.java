@@ -29,6 +29,7 @@ import java.util.Optional;
 public class TrainingDayService {
 
     private static final Logger log = LoggerFactory.getLogger(TrainingDayService.class);
+    private static final int MAX_NORMALIZED_EXERCISE_NAME_LENGTH = 255;
 
     private final TrainingDayParser parser;
     private final OpenAiTrainingDayParser openAiTrainingDayParser;
@@ -178,7 +179,11 @@ public class TrainingDayService {
             return null;
         }
 
-        return name.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        String normalized = name.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        if (normalized.codePointCount(0, normalized.length()) <= MAX_NORMALIZED_EXERCISE_NAME_LENGTH) {
+            return normalized;
+        }
+        return normalized.substring(0, normalized.offsetByCodePoints(0, MAX_NORMALIZED_EXERCISE_NAME_LENGTH));
     }
     
     /**

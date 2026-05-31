@@ -37,6 +37,10 @@ public class TrainingDayParser {
     // Pattern for sets x reps like "3 x 6", "3x8-10", "4x6+", or "2xMAX".
     private static final Pattern SET_REP_PATTERN = Pattern.compile("(\\d+)\\s*[xхX]\\s*([\\p{L}\\d]+(?:-[\\p{L}\\d]+)?\\+?)");
     private static final Pattern TRAILING_PAREN_NOTE_PATTERN = Pattern.compile("\\s+(\\([^)]*\\))\\s*$");
+    private static final Pattern LEADING_X_REPS_PATTERN = Pattern.compile(
+            "^(.*\\S)\\s+[xхX]\\s*(\\S+(?:\\s+(?:sec|secs|second|seconds|min|mins|minute|minutes|сек|секунд[аы]?|мин|минут[аы]?))?)(?:\\s+(.*\\S))?$",
+            Pattern.CASE_INSENSITIVE
+    );
     private static final Pattern TRAILING_REPS_ONLY_PATTERN = Pattern.compile("^(.*\\S)\\s+(AMRAP|MAX)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern CIRCUIT_SECTION_PATTERN = Pattern.compile("(?i).*\\d+\\s*(?:rounds?|circles?|круг(?:а|ов)?).*");
     // Pattern for any URL
@@ -110,18 +114,25 @@ public class TrainingDayParser {
                         ex.setName(withoutUrls);
                     }
                 } else {
-                    Matcher repsOnlyMatcher = TRAILING_REPS_ONLY_PATTERN.matcher(withoutUrls);
-                    if (repsOnlyMatcher.matches()) {
-                        ex.setName(repsOnlyMatcher.group(1).trim());
-                        ex.setRepsOrDuration(repsOnlyMatcher.group(2));
+                    Matcher leadingXRepsMatcher = LEADING_X_REPS_PATTERN.matcher(withoutUrls);
+                    if (leadingXRepsMatcher.matches()) {
+                        ex.setName(leadingXRepsMatcher.group(1).trim());
+                        ex.setRepsOrDuration(leadingXRepsMatcher.group(2).trim());
+                        setNotesIfPresent(ex, leadingXRepsMatcher.group(3));
                     } else {
-                        String name = withoutUrls;
-                        Matcher noteMatcher = TRAILING_PAREN_NOTE_PATTERN.matcher(name);
-                        if (noteMatcher.find()) {
-                            ex.setNotes(noteMatcher.group(1).trim());
-                            name = name.substring(0, noteMatcher.start()).trim();
+                        Matcher repsOnlyMatcher = TRAILING_REPS_ONLY_PATTERN.matcher(withoutUrls);
+                        if (repsOnlyMatcher.matches()) {
+                            ex.setName(repsOnlyMatcher.group(1).trim());
+                            ex.setRepsOrDuration(repsOnlyMatcher.group(2));
+                        } else {
+                            String name = withoutUrls;
+                            Matcher noteMatcher = TRAILING_PAREN_NOTE_PATTERN.matcher(name);
+                            if (noteMatcher.find()) {
+                                ex.setNotes(noteMatcher.group(1).trim());
+                                name = name.substring(0, noteMatcher.start()).trim();
+                            }
+                            ex.setName(name);
                         }
-                        ex.setName(name);
                     }
                 }
 

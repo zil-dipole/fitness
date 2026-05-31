@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/015-add-user-language.yaml
   - include:
       file: db/changelog/016-add-user-telegram-username.yaml
+  - include:
+      file: db/changelog/017-widen-exercise-text-fields.yaml

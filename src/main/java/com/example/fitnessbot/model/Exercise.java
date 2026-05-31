@@ -27,15 +27,18 @@ public class Exercise {
     /** Order inside the day */
     private Integer position;
 
+    @Column(columnDefinition = "text")
     private String section; // e.g., "Активация разминка"
+
+    @Column(columnDefinition = "text")
     private String name;    // exercise name
 
-    @Column(name = "normalized_name")
+    @Column(name = "normalized_name", length = 255)
     private String normalizedName;
 
     private Integer sets;   // optional
 
-    @Column(name = "reps_or_duration")
+    @Column(name = "reps_or_duration", columnDefinition = "text")
     private String repsOrDuration; // e.g., "10", "20 sec", "x 8"
 
     @ElementCollection

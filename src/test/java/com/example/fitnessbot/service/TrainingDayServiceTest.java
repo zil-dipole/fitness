@@ -487,4 +487,35 @@ class TrainingDayServiceTest {
         assertThat(savedExercise.getCanonicalExercise()).isEqualTo(canonicalExercise);
         assertThat(savedExercise.getLastWeightKg()).isEqualTo(75.0);
     }
+
+    @Test
+    void testProcessForwardedMessageTruncatesLongNormalizedExerciseName() {
+        String rawText = "Workout:\n- Long exercise\n";
+        String longExerciseName = "Bench " + "Press ".repeat(60);
+
+        User user = new User();
+        user.setId(1L);
+        user.setTelegramId(TEST_TELEGRAM_ID);
+        user.setUseAiParser(false);
+
+        TrainingDay parsedTrainingDay = new TrainingDay();
+        parsedTrainingDay.setTitle("Workout:");
+        Exercise exercise = new Exercise();
+        exercise.setName(longExerciseName);
+        exercise.setSection("Main");
+        parsedTrainingDay.setExercises(List.of(exercise));
+
+        when(userRepository.findByTelegramId(TEST_TELEGRAM_ID)).thenReturn(Optional.of(user));
+        when(parser.parse(rawText)).thenReturn(parsedTrainingDay);
+        when(exerciseRepository.findCanonicalExercisesForUser(eq(1L), anyString(), any()))
+                .thenReturn(List.of());
+        when(trainingDayRepository.save(any(TrainingDay.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TrainingDay result = trainingDayService.processForwardedMessage(TEST_TELEGRAM_ID, rawText);
+
+        ArgumentCaptor<String> normalizedNameCaptor = ArgumentCaptor.forClass(String.class);
+        verify(exerciseRepository).findCanonicalExercisesForUser(eq(1L), normalizedNameCaptor.capture(), any());
+        assertThat(normalizedNameCaptor.getValue()).hasSize(255);
+        assertThat(result.getExercises().getFirst().getNormalizedName()).hasSize(255);
+    }
 }

@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-widen-exercise-text-fields
+      author: developer
+      changes:
+        - modifyDataType:
+            tableName: exercises
+            columnName: section
+            newDataType: text
+        - modifyDataType:
+            tableName: exercises
+            columnName: name
+            newDataType: text
+        - modifyDataType:
+            tableName: exercises
+            columnName: reps_or_duration
+            newDataType: text
